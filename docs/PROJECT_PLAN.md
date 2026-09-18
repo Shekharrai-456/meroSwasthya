@@ -10,18 +10,18 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-API-001 | Global error envelope | NOT_STARTED | `src/plugins/envelope.ts` | `test/foundation.test.ts` | |
-| REQ-API-002 | Validation error shape | NOT_STARTED | `src/plugins/envelope.ts` | `test/foundation.test.ts` | |
-| REQ-API-003 | 500 errors never leak internals | NOT_STARTED | `src/plugins/envelope.ts` | `test/foundation.test.ts` | |
-| REQ-API-004 | Success envelope shape | NOT_STARTED | `src/plugins/envelope.ts` | `test/foundation.test.ts` | |
-| REQ-API-005 | version + updatedAt on syncables | NOT_STARTED | `prisma/schema.prisma` | `test/foundation.test.ts` | schema-level, verified once |
+| REQ-API-001 | Global error envelope | VERIFIED | `src/plugins/envelope.ts` | `test/foundation.test.ts` | |
+| REQ-API-002 | Validation error shape | VERIFIED | `src/plugins/envelope.ts` | `test/foundation.test.ts` | |
+| REQ-API-003 | 500 errors never leak internals | VERIFIED | `src/plugins/envelope.ts` | `test/foundation.test.ts` | |
+| REQ-API-004 | Success envelope shape | IMPLEMENTED | `src/plugins/envelope.ts` (`reply.ok`) | — | decorator exists; no real route calls it yet (health routes return plain bodies, not the envelope, by design — infra probes, not API data) |
+| REQ-API-005 | version + updatedAt on syncables | NOT_STARTED | `prisma/schema.prisma` | `test/foundation.test.ts` | no models exist yet — convention applies starting Session 3 |
 | REQ-API-006 | Cursor pagination only | NOT_STARTED | (convention, enforced per-module) | per-module tests | no shared code artifact |
-| REQ-API-007 | Serializers only, no raw Prisma out | NOT_STARTED | `src/lib/serializers.ts` | per-module tests | |
-| REQ-API-008 | Date/timestamp format rules | NOT_STARTED | `src/lib/dates.ts` | `test/foundation.test.ts` | |
-| REQ-SEC-002 | CORS open (hackathon-only) | NOT_STARTED | `src/server.ts` (`@fastify/cors`), `src/config.ts` | — (config value) | revisit before any real deploy |
-| REQ-SEC-003 | Secure headers | NOT_STARTED | `src/server.ts` (`@fastify/helmet`) | `test/foundation.test.ts` | |
-| REQ-SEC-004 | No sensitive data in logs | NOT_STARTED | `src/server.ts` (pino redact), `src/plugins/envelope.ts` | `test/foundation.test.ts` | |
-| REQ-SEC-001 | Rate-limit plugin infra (limits attach per-route in later phases) | NOT_STARTED | `src/plugins/ratelimit.ts` | per-module tests | plugin only here; specific limits tested in Auth/Grants phases |
+| REQ-API-007 | Serializers only, no raw Prisma out | NOT_STARTED | `src/lib/serializers.ts` | per-module tests | no entities to serialize yet |
+| REQ-API-008 | Date/timestamp format rules | IMPLEMENTED | `src/lib/dates.ts` | — | helpers exist, unused until a module needs them; no test written for two one-line wrappers with no branching |
+| REQ-SEC-002 | CORS open (hackathon-only) | VERIFIED | `src/app.ts` (`@fastify/cors`), `src/config.ts` | `test/foundation.test.ts` (indirectly, via passing suite with the plugin registered) | revisit before any real deploy |
+| REQ-SEC-003 | Secure headers | IMPLEMENTED | `src/app.ts` (`@fastify/helmet`) | — | registered; no test asserts the actual header values are present |
+| REQ-SEC-004 | No sensitive data in logs | IMPLEMENTED | `src/app.ts` (pino serializers strip req/res bodies) | — | nothing secret exists to log yet (no auth); re-verify explicitly once PINs/tokens exist in Session 3 |
+| REQ-SEC-001 | Rate-limit plugin infra (limits attach per-route in later phases) | IMPLEMENTED | `src/plugins/ratelimit.ts` | per-module tests | plugin registered with a global 300/min default; no test asserts a 429 yet — deferred to Auth/Grants phases as planned |
 
 ## Phase 1 — Reference data & static services
 
