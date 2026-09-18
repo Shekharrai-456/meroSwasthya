@@ -1,0 +1,120 @@
+# Tech Decisions — Swasthya Card Backend
+
+CLAUDE.md §14 requires verifying anything version-sensitive against current official docs rather than memory, capped at ~3 lookups per decision. All version claims below were checked via web search on 2026-09-18 (today). Several of `documentation/backend.md` §3's literal version pins turned out to be stale enough to be a real risk (one is end-of-life, one has a breaking API removal relevant to this project, one's upstream repo status changed) — each is called out explicitly rather than silently deviated from.
+
+For each decision: what it is, why this project needs it, why this option, alternatives rejected, tradeoffs, security notes, maintenance outlook, and a checked source + date.
+
+---
+
+## Runtime & language: Node.js 20 LTS, TypeScript 5 (strict)
+
+**What / why needed:** the runtime and language for the entire backend. **Why this option:** matches `backend.md` §3 exactly — no reason to deviate; Node 20 is an active LTS line and every other chosen library in this stack targets it. **Alternatives rejected:** none considered — the product spec fixes this and nothing in the requirements argues against it. **Tradeoffs:** none beyond the normal Node single-threaded-event-loop caveat, which is irrelevant at hackathon/district scale. **Security:** stay on the LTS patch line, apply `npm audit`-flagged patches during Session 6 hardening. **Maintenance:** Node 20 LTS support runs well past this project's horizon. **Source:** not independently re-verified (no material version-sensitivity beyond "is Node 20 still supported," which is common knowledge and not disputed by anything found during this session's research).
+
+## Web framework: **Fastify 5** (deviates from `backend.md`'s "Fastify 4")
+
+**What:** the HTTP server and plugin/route framework everything else attaches to.
+**Why this project needs it:** schema-based validation hooks, a mature plugin ecosystem (`@fastify/cors`, `@fastify/rate-limit`, `@fastify/static`, `@fastify/helmet`), and low overhead — all directly used by REQ-API-001..008 and REQ-SEC-002/003.
+**Why this option over the spec's literal pin:** **Fastify v4 reached end-of-life on 2025-06-30** — it no longer receives security patches. Building a new project on it in September 2026 means shipping on an unsupported major version from day one, which directly conflicts with CLAUDE.md's evidence/quality bar. Fastify v5 is the current, actively maintained GA release (5.12.x line as of this check), targets Node 20+ exactly as this project already requires, and removed only deprecated APIs that this project's spec never used (backend.md's route/plugin patterns are unaffected).
+**Alternatives rejected:** Express (backend.md explicitly chose Fastify for schema-friendliness and speed — REQ-API-002's `details = {field: message}` validation shape is easiest to produce from Fastify's/zod's error output, not Express's); NestJS (adds a DI/decorator framework with no requirement behind it — CLAUDE.md §15).
+**Tradeoffs:** the plugin ecosystem versions (`@fastify/cors`, `@fastify/rate-limit`, `@fastify/helmet`, `@fastify/static`) must each be confirmed Fastify-5-compatible when `package.json` is actually written in Session 2 — this is a one-line `npm view <pkg> peerDependencies` check per package, not re-verified here to stay within the lookup budget.
+**Security:** being on a supported major line is itself the security-relevant fact here.
+**Maintenance:** actively developed; per this session's research, no Fastify 6 has been announced, so v5 is a stable target for the project's lifetime.
+**Source:** [Fastify v5 Migration Guide](https://fastify.dev/docs/v5.1.x/Guides/Migration-Guide-V5/); [fastify on npm](https://www.npmjs.com/package/fastify) — both checked 2026-09-18.
+
+## Validation: **zod v4** (backend.md specified "zod" with no version)
+
+**What:** request body/query/param schema validation, one schema per request, types inferred from schemas (REQ-API-002).
+**Why this project needs it:** REQ-API-002's `VALIDATION_ERROR` / field-level `details` shape depends entirely on a validator that can report per-field errors, and REQ-API-007's "no raw Prisma objects out" pairs naturally with zod-inferred response-adjacent types.
+**Why v4 specifically:** it's the current major version; v3 is not being newly adopted for a project starting today.
+**Alternatives rejected:** `class-validator`/`class-transformer` (decorator-based, framework coupling NestJS-style — no requirement calls for it); `io-ts` (steeper learning curve, no advantage for this project's flat request shapes).
+**Tradeoffs / breaking changes vs. the v3 syntax an older tutorial might show:** error access is `error.issues` not `error.errors`; `.format()`/`.flatten()` call sites must match v4's shape; `z.record(value)` must become `z.record(keySchema, valueSchema)` (two-argument form) — this project's schemas should be written directly against v4 docs, not copied from a v3-era tutorial. A community codemod (`zod-v3-to-v4`) exists if any v3-shaped snippet slips in.
+**Security notes:** none specific — zod is a parsing/validation library, not a crypto or auth surface.
+**Maintenance:** actively developed, and the search results show real 2026 adoption/perf work (v4 claims materially faster parsing than v3), so this is not a fringe pick.
+**Source:** [Zod v4 release notes](https://zod.dev/v4); [Zod v4 changelog](https://zod.dev/v4/changelog) — checked 2026-09-18.
+
+## ORM & migrations: **Prisma 7** (deviates from `backend.md`'s "Prisma 5")
+
+**What:** the ORM, migration tool, and generated client for PostgreSQL access (REQ-API-007, CLAUDE.md §9's "Alembic-equivalent owns the schema" rule — here, Prisma Migrate owns it).
+**Why this project needs it:** typed queries matching `docs/DATA_MODEL.md`'s schema, a migration history with `up`/`down` tested per CLAUDE.md §9, and transaction support for the multi-table writes in `docs/ARCHITECTURE.md` §7.
+**Why 7, not the spec's literal 5, and not the newest 8:** **Prisma 8 is only a release candidate as of this check** (GA expected October 2026) and explicitly does not yet support several features this project needs or may need: nested writes (this project's pregnancy-creation transaction — REQ-PREG-004 — creates a pregnancy plus 8 AncContacts in one operation, exactly the kind of nested-write pattern called out as still-missing in 8-RC) and JSON-column filtering (potentially relevant to querying `diagnosisCodes`/`riskFactors` later). **Prisma 5**, the literal spec pin, is now two major versions behind a **rust-free, faster client** that shipped in 7 — adopting 5 fresh today would mean immediately being on a version with a defined EOL clock once 8 goes GA (v6 gets 18 months of fixes after 8's GA; 5 is older than that). Prisma 7 is the current stable line with none of 8-RC's missing-feature risk.
+**Alternatives rejected:** Drizzle ORM (lighter, SQL-closer, but the whole schema/migration/seed workflow in `backend.md` §6/§10 is written in Prisma's schema DSL and seed-script idiom already — rewriting it in Drizzle is a cost with no requirement behind it); raw `pg`/`node-postgres` (loses the typed-client and migration-history benefits CLAUDE.md §9 requires).
+**Tradeoffs:** confirm at Session 2 install time that Prisma 7's engine/generator changes don't require any adjustment to the `schema.prisma` syntax already fixed by `backend.md` §6 (expected to be a drop-in — the schema uses no Prisma-5-specific syntax that changed).
+**Security notes:** parameterized queries throughout (SECURITY.md row 9); migration files are the only place raw SQL appears, and only for the two hand-added constraints in `docs/DATA_MODEL.md` (static DDL, never built from request input).
+**Maintenance:** Prisma 7 is the actively-recommended stable release as of this check, with 8 not yet GA.
+**Source:** [Prisma ORM release status](https://www.prisma.io/docs/orm/release-status); [Announcing Prisma ORM 7.0.0](https://www.prisma.io/blog/announcing-prisma-orm-7-0-0) — checked 2026-09-18.
+
+## Database: PostgreSQL 16
+
+**What/why:** relational store, matches `docs/DATA_MODEL.md`'s schema (partial unique index, check constraints, jsonb columns). **Why this option:** fixed by `backend.md` §3/§6 — no reason to deviate; PostgreSQL 16 fully supports every feature the schema uses (partial indexes, `jsonb`, `CHECK`). **Alternatives rejected:** MongoDB (the schema is fundamentally relational — patients own visits/documents/pregnancies with real foreign keys and a partial-unique-index business rule that has no clean document-DB equivalent). **Tradeoffs:** none identified. **Security:** standard Postgres role/credential hygiene via `DATABASE_URL` from config, never hard-coded. **Maintenance:** PostgreSQL 16 is a supported major version. **Source:** not independently re-verified — no material version-sensitivity found; this is a stable, uncontested choice.
+
+## Auth tokens: **jose v6** (JWT, HS256)
+
+**What/why:** signs/verifies access tokens, temp tokens, and grant tokens (two separate HS256 secrets — REQ-AUTH-010, REQ-GRANT-001). **Why this option:** `jose`'s `SignJWT`/`jwtVerify` API is exactly what `backend.md` §7.2 already assumes, is Web-Crypto-based (works identically across the eventual test runner and any future edge/serverless deployment), and rejects `alg:"none"` by default — a real security property worth confirming rather than assuming (SECURITY.md row 4). **Alternatives rejected:** `jsonwebtoken` (older callback-style API, weaker default algorithm-confusion protections historically documented against it as a library, not against `jose`). **Tradeoffs:** none found. **Security:** HS256 requires the two secrets (`JWT_SECRET`, `GRANT_SECRET`) to be high-entropy and never shared between purposes — already required by `backend.md` §5's env table. **Maintenance:** current version 6.2.x, actively published (a release within the prior two weeks at the time of this check). **Source:** [jose on npm](https://www.npmjs.com/package/jose) — checked 2026-09-18.
+
+## Password/PIN hashing: **argon2** (Node native-binding package) — flag a Windows install risk
+
+**What/why:** hashes PINs and refresh tokens (REQ-SEC-005). argon2id is the OWASP-recommended password-hashing algorithm; no alternative was seriously considered because `backend.md` §3 already specifies it and it's the correct choice.
+**Version / parameters:** current `argon2` npm package is in the 0.44–0.45.x range, defaulting to memory=65536 KiB, time=3, parallelism=4 for its native argon2id mode — these defaults are reasonable for interactive login hashing (OWASP's 2026 guidance range for argon2id sits in a comparable memory/time band) and are used as-is unless Session 2's own load testing says otherwise.
+**Risk flagged for Session 2 (this development machine is Windows):** the `argon2` package requires native bindings (a compiled addon), which historically has had rougher install experiges on Windows than on Linux/macOS (build-tools/prebuilt-binary mismatches). **Action for Session 2:** attempt `npm install argon2` first; if the native build fails or is slow in the Windows dev environment, fall back to `@node-rs/argon2` (a Rust/napi-rs-based alternative package with prebuilt binaries for more platforms, same argon2id algorithm, different API surface) rather than silently downgrading to a weaker hash. This is a documented contingency, not a silent substitution — whichever is actually installed must be recorded in this file's changelog at that time.
+**Alternatives rejected:** `bcrypt` (no memory-hardness — weaker against GPU/ASIC attacks than argon2id, and `backend.md` already specifies argon2id).
+**Security:** never log the hash or the raw PIN (REQ-SEC-004); cost parameters live in config, not hard-coded, so they can be tuned without a code change.
+**Maintenance:** actively maintained; Node engine requirement (>=22 for some documented alternative wrappers) should be double-checked against this project's Node 20 pin at install time in Session 2.
+**Source:** [argon2 on npm](https://www.npmjs.com/package/argon2); [argon2 on Socket](https://socket.dev/npm/package/argon2) — checked 2026-09-18.
+
+## Queue / scheduling: **BullMQ v6** + Redis 7 — **breaking-change flag**
+
+**What/why:** the `reminders` (repeatable, every 60 s) and `ai-summary` (one-shot) background jobs (REQ-REMIND-001, REQ-DOC-006/007).
+**Critical finding — must change the implementation pattern from what `backend.md` §9.6 literally describes:** **BullMQ v6 (current default line, shipped 2026-07-30) removed the legacy repeatable-jobs API** (`repeat: { every: ... }` on `Queue.add`, the `Repeat` class) in favor of **Job Schedulers** (`queue.upsertJobScheduler(...)`). `backend.md` §9.6's "BullMQ (repeat every 60 s)" phrasing describes the *old* API. **Decision: use BullMQ v6 with `upsertJobScheduler` for the reminders poll, not the legacy `repeat` option** — adopting v6 with the old API pattern would simply not work; staying on v5.81.x (the last pre-v6 line, still receiving fixes) to keep the old API alive would mean building on a line with a visible sunset date. v6 with the current Job Scheduler API is the only combination that's both correct and forward-looking.
+**Redis version:** BullMQ v6 requires Redis ≥6.2 for full compatibility; Redis 7.x (the spec's pin) and 8.x both work — **REQ-REMIND-001's Redis 7 pin is confirmed fine as-is**, no change needed there.
+**Alternatives rejected:** Agenda/Bree (Mongo- or worker-thread-based respectively — no reason to introduce a second datastore or abandon Redis, which is already needed for the PIN-lockout counter, REQ-AUTH-006); a hand-rolled `setInterval` poller (loses BullMQ's retry/backoff and failure-visibility guarantees required by REQ-REMIND-003 and CLAUDE.md §15's "don't reinvent what a well-chosen dependency already does").
+**Tradeoffs:** the Job Scheduler API is a small, mechanical rewrite of the same polling behavior — no functional loss versus what `backend.md` describes, just a different call to set it up.
+**Security:** queue payloads never contain PINs/tokens/full message bodies logged at info level (REQ-SEC-004) — reminder jobs carry only ids/phone numbers/pre-rendered message text, already the case in the spec.
+**Maintenance:** v6 is the actively developed default line as of this check; v5.81.x is legacy-maintenance only.
+**Source:** [BullMQ changelog](https://docs.bullmq.io/changelog); [BullMQ Redis compatibility](https://docs.bullmq.io/guide/redis-tm-compatibility/); [BullMQ Repeatable jobs guide](https://docs.bullmq.io/guide/jobs/repeatable) — all checked 2026-09-18.
+
+## Object storage: MinIO (S3-compatible) via **@aws-sdk/client-s3 + @aws-sdk/s3-request-presigner v3** — **maintenance-status flag**
+
+**What/why:** presigned upload/download for Documents (REQ-DOC-001..008), running locally via `docker-compose` for the hackathon (`backend.md` §5).
+**Finding worth flagging, not a blocker:** **the MinIO OSS GitHub repository was archived (made read-only) on 2026-02-13**, per this session's search results, and MinIO's marketing now foregrounds a commercial "AIStor" product for S3 compatibility. This is a real maintenance-outlook concern for anything beyond this hackathon's timeframe — **do not treat MinIO as a long-term-supported dependency without re-checking its project status before any production deployment decision.** For the 32-hour build itself, this changes nothing operationally: the already-published `minio/minio` Docker image continues to run identically via `docker-compose`, so Session 2 proceeds with MinIO as specced.
+**AWS SDK v3 packages:** current versions of `@aws-sdk/client-s3`/`@aws-sdk/s3-request-presigner` are both in the `3.11xx.x` range and are still the correct, current way to generate S3-compatible presigned URLs — no material API change from what `backend.md` §9.4 assumes.
+**Known compatibility gotcha (confirmed via search, worth pre-empting rather than discovering during Session 5):** presigned URLs generated by AWS SDK v3 against MinIO have documented `SignatureDoesNotMatch`/`AccessDenied: unsigned headers` failures in some configurations, generally tied to how the endpoint host/port is set when `endpointOverride`/`forcePathStyle` options are (mis)configured. **Action for the module that implements this (`modules/documents/storage.ts`):** set `forcePathStyle: true` and an explicit `endpoint` pointing at the public/tunnel host (not `localhost`) when constructing the S3 client, and verify one real presigned PUT against the running MinIO container as the first thing built in that module, before writing any other document-upload logic — this is exactly the failure mode `backend.md` §5's own "gotcha" note about phones/localhost was already warning about, just with an additional, specific root cause now identified.
+**Alternatives rejected:** storing files on local disk (breaks the moment this runs anywhere but one laptop, and the presign/PUT/complete flow is already baked into the frontend contract — REQ-DOC-003); a different S3-compatible server (SeaweedFS, Garage) — no requirement drives a change from the spec's MinIO pin given it still runs fine as a container for this build's timeframe.
+**Tradeoffs:** the archived-repo status is a real long-term risk noted above, accepted for hackathon scope.
+**Security:** object keys are server-generated UUIDs (REQ-DOC-008); URLs expire (15 min upload / 1 h download); bucket credentials come from config only.
+**Maintenance:** AWS SDK v3 packages are actively published (multiple releases per day observed); MinIO OSS's own maintenance trajectory is the flagged risk above.
+**Source:** [@aws-sdk/s3-request-presigner on npm](https://www.npmjs.com/package/@aws-sdk/s3-request-presigner); MinIO GitHub issues discussing SDK v3 signature mismatches — checked 2026-09-18.
+
+## SMS: adapter interface — `MockSms` (Tier 1) / `SparrowSms` (Tier 2)
+
+**What/why:** REQ-REMIND-002. **Why this option:** the mock adapter is what the demo actually runs on (`SMS_MODE=mock`), and it needs zero external verification. Sparrow SMS is Nepal-specific and Tier 2 (`backend.md` §2.2) — its token/sender-ID approval process is an external, account-level dependency, not something resolvable by documentation research. **Action, not a decision made here:** verify Sparrow's current REST API shape directly against their own docs only if/when Tier 2 is picked up in Session 5, per CLAUDE.md §14's "official docs first" — no speculative integration work is done against it now. **Alternatives rejected:** none — this is a two-line adapter interface (`SmsAdapter.send(to, text)`), not a library choice.
+
+## AI summary (Tier 2): Anthropic Messages API, vision input
+
+**What/why:** REQ-DOC-007, gated behind `AI_MODE=on`. Per this session's active `claude-api` skill guidance (triggered whenever Anthropic/Claude/model choice comes up): when this is actually built in Session 5, look up current Claude model IDs and vision-input message format directly rather than from memory, since model names/ids change over time and this document intentionally does not hardcode one now (no model choice has been requirement-tested yet, and hardcoding one here would violate CLAUDE.md §14's "don't guess at version-sensitive facts" for something not yet being built). **Alternatives rejected:** none evaluated yet — Tier 2, deferred.
+
+## Logging: **pino** (+ `pino-pretty` dev-only)
+
+**What/why:** structured JSON logs with per-request context (REQ-API log line, REQ-SEC-004). **Why this option:** matches `backend.md` §3 exactly; Fastify has first-class pino integration (`fastify.log`). **Alternatives rejected:** winston (heavier, no requirement calls for its extra transport flexibility). **Tradeoffs:** `pino-pretty` is explicitly a dev-only dependency — confirmed still the recommended pattern (not deprecated) — never enabled in production (matches `backend.md`'s own dev/prod split and REQ-SEC-004's "no unnecessary data exposure" spirit, since pretty-printing is purely a local-DX feature). **Security:** redaction paths configured for any field that could accidentally carry a secret-shaped value. **Maintenance:** both packages actively published as of this check. **Source:** [pino-pretty on npm](https://www.npmjs.com/package/pino-pretty) — checked 2026-09-18; no material version-sensitivity beyond confirming it's still the recommended dev-transport (it is).
+
+## Testing: **vitest**, primarily via **Fastify's `.inject()`**, `supertest` only where a real socket is needed
+
+**What/why:** REQ-TEST-001..006's test suites (rules, sync, grants, auth, per-module, smoke).
+**Why vitest over Jest:** matches `backend.md` §3; vitest's native ESM/TS support avoids the ts-jest configuration overhead Jest would add, with no requirement pulling toward Jest specifically.
+**Refinement over the spec's literal "vitest + supertest (light)":** current guidance (confirmed via search) is that **`fastify.inject()` is now the more idiomatic default** for testing a Fastify app — it runs a request through the full plugin/hook/handler lifecycle without opening a real socket, which is faster and sufficient for essentially every test this project needs (REQ-TEST matrix, error-envelope shape tests, authorization matrix). **Decision:** use `.inject()` for the vast majority of tests; reserve `supertest` (kept as the spec's own "(light)" qualifier already implies minimal use) for the one or two cases that need a genuinely listening server — realistically only a boot/smoke test that the app actually starts and accepts real TCP connections (complementing, not replacing, the `.inject()`-based suite). This is a refinement of emphasis, not a contradiction of the spec — both tools stay in the dependency list exactly as `backend.md` names them.
+**Alternatives rejected:** Jest (see above).
+**Tradeoffs:** `.inject()` doesn't exercise the real network stack (e.g., won't catch a TCP keep-alive misconfiguration) — acceptable, since REQ-TEST's actual coverage goals (endpoint behavior, authorization, error shapes, business rules) are about request/response semantics, not transport-layer behavior.
+**Source:** [supertest vs fastify.inject vs hono/testing 2026 guide](https://www.pkgpulse.com/guides/supertest-vs-fastify-inject-vs-hono-testing-api-2026); [Fastify Testing guide](https://fastify.dev/docs/v5.3.x/Guides/Testing/) — checked 2026-09-18.
+
+## Not adopted (requirements don't call for them)
+
+- **Payments** (Stripe/any provider) — no payment flow in any feature tier (backend.md §2.2). Not evaluated, not added.
+- **A generic cache layer** (Redis-as-cache beyond its queue/lockout-counter role) — see `docs/ARCHITECTURE.md` §9; the two cacheable reads (`codelists`, `rules`) are served via HTTP `Cache-Control` instead.
+- **GraphQL** — every endpoint in Part A.4 is a fixed REST shape the frontend is already built against; introducing GraphQL would mean re-deriving a contract that already exists.
+- **A dedicated search engine** (Elasticsearch/Meilisearch) — no search/filter grammar exists in the requirements (`docs/API_CONTRACT.md` §5).
+
+## Session 2 action items arising from this research (not decisions, just verification steps to run at install time)
+
+1. Confirm `@fastify/cors`, `@fastify/rate-limit`, `@fastify/helmet`, `@fastify/static` each have a Fastify-5-compatible release before pinning versions in `package.json`.
+2. Attempt `npm install argon2` on this Windows dev machine first; fall back to `@node-rs/argon2` only if the native build genuinely fails, and record whichever was actually used back in this file.
+3. Write the reminders worker against BullMQ v6's `upsertJobScheduler` API, not the removed `repeat` option — do not copy a v5-era or older tutorial's code.
+4. Configure the S3 client with `forcePathStyle: true` and an explicit non-`localhost` `endpoint`, and prove one real presigned PUT against the running MinIO container before building the rest of the documents module.
