@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import fp from 'fastify-plugin';
 import { Role } from '../../../generated/prisma/enums.js';
 import { docSchema, noopSerializerCompiler, noopValidatorCompiler } from '../../lib/routeDocs.js';
 import {
@@ -30,7 +29,15 @@ import * as authService from './service.js';
 // route: requireAuth/requireTemp (when applicable) -> zod schema.parse() ->
 // authService call -> reply.ok(result), per docs/ARCHITECTURE.md §3's request
 // lifecycle. No route touches Prisma directly (REQ-API-007).
-export const authRoutes = fp(async (app: FastifyInstance) => {
+//
+// Deliberately NOT wrapped in fastify-plugin (fp()) - that was a real Session
+// 3 bug found only once this ran against a real server: fp() breaks out of
+// Fastify's encapsulation context, which is also what makes `register(...,
+// {prefix})` apply. Every route below was silently registered at its bare
+// path (e.g. `/auth/otp/request`) instead of `/api/v1/auth/otp/request`,
+// discovered by printing the real route tree (`app.printRoutes()`) - see
+// docs/PROGRESS.md.
+export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/auth/otp/request',
     {
@@ -174,4 +181,4 @@ export const authRoutes = fp(async (app: FastifyInstance) => {
       return reply.ok({ user });
     },
   );
-});
+}

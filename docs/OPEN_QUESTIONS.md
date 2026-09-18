@@ -67,3 +67,18 @@ OPTIONS:    A. Install Docker Desktop (or enable WSL2 + Docker) on this machine,
             D. Run future sessions (or at least their `npm run test`/`make check` step) in an environment that already has Docker - a devcontainer, CI runner, or a different machine - rather than this sandbox.
 RECOMMEND:  A, if this machine can have Docker Desktop installed - it's the path `docker-compose.yml`, the seed script, and every session's design already assume, and needs no code changes. B is the fallback if Docker genuinely can't be installed here.
 **BLOCKED — awaiting the user.** Every DB-touching test written so far (`test/foundation.test.ts`'s `/health/ready` case, all of `test/auth.test.ts`, `test/authz-matrix.test.ts`) is real, unmocked code that has never actually executed successfully in this sandbox; see `docs/PROGRESS.md`'s Session 2 and Session 3 entries for the exact failure evidence each time.
+
+**RESOLVED (Session 3, continued - user asked to remove Docker and have the session connect everything directly):** neither Docker Desktop nor WSL2 could be installed non-interactively on this machine (winget-driven installs require admin elevation this shell doesn't have). Resolved with Option A's spirit but not its letter - **portable, no-install binaries** instead of Docker:
+- PostgreSQL 17.11 (EDB's official Windows binaries zip, not the installer) at `%LOCALAPPDATA%\swc-dev\postgres`, data directory at `%LOCALAPPDATA%\swc-dev\postgres\data`, listening on **port 5544** (not 5432 - two other, unrelated, pre-existing Postgres instances already occupy 5432 and 5433 on this machine). Superuser `swc` / password `swc`, databases `swc` and `swc_test` already created and migrated.
+- Redis 8.10.2 (redis-windows/redis-windows GitHub build) at `%LOCALAPPDATA%\swc-dev\redis`, listening on the standard port 6379.
+- `backend/.env` (git-ignored) already points at both. `backend/.env.example`'s documented port 5432 is deliberately left as the "clean machine with Docker" default and was not changed.
+
+**Important caveat for future sessions/the user:** both run as **plain background processes**, not Windows services - they do **not** survive a reboot or a `pg_ctl`/`redis-server` process being killed. To restart them after a reboot:
+```
+# Postgres
+C:\Users\shekh\AppData\Local\swc-dev\postgres\pgsql\bin\pg_ctl.exe -D C:\Users\shekh\AppData\Local\swc-dev\postgres\data -l C:\Users\shekh\AppData\Local\swc-dev\postgres\server.log -o "-p 5544" start
+
+# Redis
+C:\Users\shekh\AppData\Local\swc-dev\redis\Redis-8.10.2-Windows-x64-msys2\redis-server.exe --port 6379
+```
+If this ever needs to be a real, reboot-surviving setup (or the user later gets Docker/admin rights working), migrating to `docker compose up -d` per the project's original design remains the recommended long-term path - nothing about the portable setup is meant to be permanent infrastructure.
