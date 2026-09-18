@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+*.log
+.DS_Store
+Thumbs.db
+
+# Prisma 7's generated client (backend/generated/prisma) - build output, not source.
+backend/generated/
