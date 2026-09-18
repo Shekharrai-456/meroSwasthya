@@ -1,6 +1,6 @@
-import fp from 'fastify-plugin';
 import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance } from 'fastify';
+import fp from 'fastify-plugin';
 import { ErrorCode } from '../lib/errors.js';
 
 // Global default only (docs/SECURITY.md row: "global 300/min/IP"). Route-specific,

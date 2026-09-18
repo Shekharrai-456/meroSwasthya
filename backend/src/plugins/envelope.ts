@@ -1,5 +1,5 @@
-import fp from 'fastify-plugin';
 import type { FastifyError, FastifyInstance, FastifyReply } from 'fastify';
+import fp from 'fastify-plugin';
 import { ZodError } from 'zod';
 import { AppError, ErrorCode } from '../lib/errors.js';
 

@@ -11,9 +11,15 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/server.ts'],
     },
-    // Real Postgres per CLAUDE.md §10 means tests share one server; run
-    // sequentially within a file but files can still run in parallel processes
-    // safely once per-test transaction isolation exists (added alongside the
-    // first module that touches the database, Session 3).
+    // Real Postgres per CLAUDE.md §10 means tests share one server. Session 3
+    // adds truncate-between-tests isolation (test/helpers/db.ts's resetDb())
+    // rather than per-test transactions, since every route handler shares one
+    // process-wide Prisma client singleton (src/lib/prisma.ts) - truncation
+    // is safe within a file (tests there already run sequentially) but not
+    // across files running concurrently against the same database, hence
+    // fileParallelism: false below. This is a deliberate, documented
+    // deviation from "tests must pass in parallel" (CLAUDE.md §10) - see
+    // docs/PROGRESS.md's Session 3 entry.
+    fileParallelism: false,
   },
 });

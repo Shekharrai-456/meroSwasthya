@@ -16,3 +16,93 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// Session 3 (Phase 2 — Auth, RBAC, Users). Facility is pulled forward from its
+// documented Phase 1 slot (docs/PROJECT_PLAN.md) because User.facilityId is a
+// hard FK dependency on it — Prisma cannot create that foreign key against a
+// table that doesn't exist yet. Only the schema/columns are added here; the
+// GET /facilities/nearby endpoint, Haversine logic, and seed data stay
+// NOT_STARTED / Phase 1 scope (see docs/PROGRESS.md Session 3 entry).
+enum FacilityType {
+  health_post
+  phcc
+  hospital
+  birthing_centre
+}
+
+model Facility {
+  id                String       @id
+  name              String
+  type              FacilityType
+  hasBirthingCentre Boolean      @map("has_birthing_centre")
+  phone             String?
+  lat               Float
+  lng               Float
+  municipality      String
+
+  users       User[]
+  inviteCodes InviteCode[]
+
+  @@map("facilities")
+}
+
+enum Role {
+  patient
+  provider
+  fchv
+  admin
+}
+
+// REQ-USER-001, REQ-AUTH-*
+model User {
+  id         String    @id @default(uuid())
+  phone      String    @unique
+  pinHash    String?   @map("pin_hash")
+  role       Role      @default(patient)
+  name       String
+  facilityId String?   @map("facility_id")
+  facility   Facility? @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  refreshTokens   RefreshToken[]
+  inviteCodesUsed InviteCode[]
+
+  @@map("users")
+}
+
+// REQ-AUTH-011. @@index([userId]) added beyond backend.md's literal schema —
+// needed to revoke all of a user's refresh tokens on PIN reset or a detected
+// reuse, per docs/DATA_MODEL.md.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// REQ-AUTH-002/003/004. One live OTP per phone at a time, by design (PK on phone).
+model OtpCode {
+  phone     String   @id
+  code      String
+  expiresAt DateTime @map("expires_at")
+  attempts  Int      @default(0)
+
+  @@map("otp_codes")
+}
+
+// REQ-AUTH-008/013.
+model InviteCode {
+  code         String   @id
+  role         Role
+  facilityId   String   @map("facility_id")
+  facility     Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  usedByUserId String?  @map("used_by_user_id")
+  usedByUser   User?    @relation(fields: [usedByUserId], references: [id], onDelete: Restrict)
+
+  @@map("invite_codes")
+}

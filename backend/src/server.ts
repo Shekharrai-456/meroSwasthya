@@ -1,6 +1,7 @@
 import { buildApp } from './app.js';
 import { config } from './config.js';
 import { prisma } from './lib/prisma.js';
+import { redis } from './lib/redis.js';
 
 async function main(): Promise<void> {
   const app = await buildApp();
@@ -9,6 +10,7 @@ async function main(): Promise<void> {
     app.log.info({ signal }, 'shutting down');
     await app.close();
     await prisma.$disconnect();
+    redis.disconnect();
     process.exit(0);
   };
   process.on('SIGINT', () => void closeGracefully('SIGINT'));

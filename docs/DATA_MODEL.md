@@ -58,6 +58,8 @@ Indexes: PK on `id`; unique on `phone` (login lookup, REQ-AUTH-001). No index on
 
 **Added index (not in `backend.md`'s literal schema):** `@@index([userId])` — needed to revoke all of a user's refresh tokens on a PIN reset (Question 2) or a detected refresh-token reuse, per standard rotation hygiene; without it, revocation-by-user is a full table scan.
 
+**Hash algorithm (Session 3):** `tokenHash` is SHA-256, not argon2 despite REQ-SEC-005's literal wording — this column's own "unique, the lookup key" constraint requires exact-match lookup, which argon2's random-salt-per-call design cannot support. See `docs/TECH_DECISIONS.md`'s "Refresh-token hashing" entry.
+
 ### OtpCode (REQ-AUTH-002/003)
 | Field | Type | Constraint |
 |---|---|---|
@@ -250,6 +252,9 @@ The `pregnancyId @unique` constraint is the DB-level backing for REQ-PREG-015's 
 Indexes: `@@index([status, dueAt])` — the worker's poll query (REQ-REMIND-001), already in `backend.md`. **Added index (not in `backend.md`'s literal schema):** `@@index([patientId])` — required by `GET /patients/:id/reminders` (REQ-REMIND-005), which has no other index to use without one; its absence in the original schema would force a full-table scan as reminder volume grows.
 
 ### Facility (REQ-FACILITY-*)
+
+**Schema built in Session 3, not Phase 1 (where this row still lives in `docs/PROJECT_PLAN.md`):** `User.facilityId` and `InviteCode.facilityId` are both FKs into this table, so it has to exist before either of those tables can be migrated. Only the columns below are built now — `GET /facilities/nearby`, the Haversine query, and seed data are still Phase 1/NOT_STARTED.
+
 | Field | Type | Constraint |
 |---|---|---|
 | id | string PK | seeded, human-readable (`f_0001`) |

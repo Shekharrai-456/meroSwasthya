@@ -122,6 +122,17 @@ For each decision: what it is, why this project needs it, why this option, alter
 **Maintenance:** actively developed; installed version 2.5.14 as of this session.
 **Source:** [Biome vs ESLint vs Oxlint 2026 guide](https://www.pkgpulse.com/guides/biome-vs-eslint-vs-oxlint-2026) — checked 2026-09-18 (Session 2).
 
+## Refresh-token hashing: **SHA-256**, not argon2 (Session 3, deviates from REQ-SEC-005's literal text)
+
+**What:** the algorithm used to hash `RefreshToken.tokenHash` before storage (REQ-AUTH-011).
+**Why this project needs it:** the refresh-token table has to support an exact-match lookup (`WHERE tokenHash = ?` against a unique index) on every `POST /auth/refresh` call - that's the whole point of storing a hash instead of the raw token.
+**Why SHA-256 over argon2/argon2id (REQ-SEC-005's literal wording):** argon2 is a password-hashing function - its defining property is a per-call random salt, which makes two hashes of the *same* input compare unequal and can only be checked one-candidate-at-a-time via `argon2.verify()`, never looked up by equality. `docs/DATA_MODEL.md`'s own schema (`tokenHash string @unique - the lookup key`) requires exactly the equality lookup argon2 cannot do. The two source requirements (REQ-SEC-005's text and REQ-AUTH-011/DATA_MODEL's schema) conflict; this is the standard-practice resolution (session tokens/API keys are conventionally hashed with a fast, deterministic digest - see e.g. Doorkeeper's or Django REST Framework's token storage) rather than a shortcut: a refresh token is already a uniformly-random 256-bit value (`crypto.randomBytes(32)`), so there is no "low-entropy secret" for a slow, memory-hard hash to protect against brute-forcing in the first place - the security property (attacker can't reconstruct the token from the DB) holds equally well with SHA-256 given the input's entropy.
+**Alternatives rejected:** argon2 with a fixed/omitted salt (defeats the point of using a password hash at all, and still slower than necessary for no benefit); keeping the raw token in the DB and relying on TLS + DB access control alone (violates REQ-AUTH-011's explicit "stored hashed" requirement).
+**Tradeoffs:** none of real consequence - SHA-256 is not memory-hard, but that property only matters for low-entropy inputs (passwords/PINs), which this isn't.
+**Security notes:** the PIN itself (a genuine low-entropy, human-chosen secret) is unaffected by this decision and still uses argon2id exactly as REQ-SEC-005 specifies (`src/lib/hash.ts`'s `hashPin`/`verifyPin`).
+**Maintenance:** `node:crypto`'s `createHash('sha256')` is a Node built-in, no dependency added.
+**Source:** standard token-hashing practice, not a version-sensitive external claim - no web lookup performed, per CLAUDE.md §14 ("out of date is costly" applies to framework APIs/crypto libraries, not to well-established cryptographic hash-selection reasoning like this). Recorded in `docs/PROGRESS.md`'s Session 3 entry and `docs/REQUIREMENTS.md`'s REQ-SEC-005 row.
+
 ## Not adopted (requirements don't call for them)
 
 - **Payments** (Stripe/any provider) — no payment flow in any feature tier (backend.md §2.2). Not evaluated, not added.

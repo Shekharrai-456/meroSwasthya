@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { buildApp } from '../src/app.js';
 import { parseConfig } from '../src/config.js';
 import { testClient } from './helpers/client.js';

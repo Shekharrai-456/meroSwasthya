@@ -1,4 +1,12 @@
+import 'dotenv/config';
 import { z } from 'zod';
+
+// Pre-existing gap found in Session 3: nothing under src/ loaded .env before
+// this - only test/setup.ts did, for vitest. `npm run dev`/`npm start` would
+// have failed at startup with "Invalid environment configuration" the first
+// time either was actually run outside a test process. dotenv.config() is a
+// no-op for any var already set in the real environment (e.g. by Docker/CI),
+// so this is safe everywhere config.ts is imported, including from tests.
 
 // Every key here must also appear in .env.example (CLAUDE.md §7). Parsed once at
 // startup; a missing/malformed required key fails loudly instead of leaving a
@@ -29,6 +37,13 @@ const envSchema = z.object({
   SMS_MODE: z.enum(['mock', 'sparrow']).default('mock'),
   SPARROW_TOKEN: z.string().optional(),
   SPARROW_FROM: z.string().optional(),
+
+  // REQ-SEC-005: argon2id cost parameters, configurable rather than
+  // hard-coded (CLAUDE.md §7). Defaults match docs/TECH_DECISIONS.md's
+  // researched argon2id baseline.
+  ARGON2_MEMORY_KIB: z.coerce.number().int().positive().default(65536),
+  ARGON2_TIME_COST: z.coerce.number().int().positive().default(3),
+  ARGON2_PARALLELISM: z.coerce.number().int().positive().default(4),
 
   OTP_MODE: z.enum(['demo', 'real']).default('demo'),
   AI_MODE: z.enum(['off', 'on']).default('off'),

@@ -28,7 +28,7 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
 | REQ-FACILITY-001 | GET /facilities/nearby, Haversine | NOT_STARTED | `src/modules/facilities/routes.ts` | `test/facilities.test.ts` | |
-| REQ-FACILITY-002 | Facility fields | NOT_STARTED | `prisma/schema.prisma` | `test/facilities.test.ts` | |
+| REQ-FACILITY-002 | Facility fields | IMPLEMENTED (schema only) | `prisma/schema.prisma` | `test/facilities.test.ts` | pulled forward into Session 3 - `User.facilityId`/`InviteCode.facilityId` are hard FK dependencies on this table; no `/facilities/nearby` route or Haversine logic added |
 | REQ-CODELIST-001 | GET /codelists, versioned, cached | NOT_STARTED | `src/modules/codelists/routes.ts` | `test/codelists.test.ts` | |
 | REQ-CODELIST-002 | CodeListItem fields | NOT_STARTED | `prisma/schema.prisma` | `test/codelists.test.ts` | |
 | REQ-META-001 | GET /rules serves RULES verbatim | NOT_STARTED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | depends on `rules.json` existing (Phase 6) |
@@ -44,30 +44,30 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-AUTH-001 | Phone E.164 normalization | NOT_STARTED | `src/modules/auth/schemas.ts` | `test/auth.test.ts` | backend validates shape only; UI normalization is frontend (OUT-OF-REPO) |
-| REQ-AUTH-002 | POST /auth/otp/request + rate limit | NOT_STARTED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-003 | Demo OTP 123456 | NOT_STARTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-004 | POST /auth/otp/verify, tempToken | NOT_STARTED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-005 | POST /auth/pin/set (create + reset) | NOT_STARTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | Question 2: also used for PIN reset |
-| REQ-AUTH-006 | POST /auth/pin/login + account lockout | NOT_STARTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | Question 6: stacked with REQ-SEC-001's route limit |
-| REQ-AUTH-007 | POST /auth/refresh, rotation | NOT_STARTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-008 | POST /auth/provider/activate | NOT_STARTED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | depends on Phase 1 seed (invite codes) |
-| REQ-AUTH-009 | GET /me | NOT_STARTED | `src/modules/auth/routes.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-010 | Access token claims/signing | NOT_STARTED | `src/plugins/auth.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-011 | Refresh token hashed, revocable | NOT_STARTED | `prisma/schema.prisma`, `src/modules/auth/service.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-012 | requireAuth() → 401 | NOT_STARTED | `src/plugins/auth.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-013 | Invite codes seeded | NOT_STARTED | `prisma/seed.ts` | `test/auth.test.ts` | depends on Phase 1 |
-| REQ-ROLE-001 | Role enum | NOT_STARTED | `prisma/schema.prisma` | — | |
-| REQ-ROLE-002 | requireRole() → 403 | NOT_STARTED | `src/plugins/auth.ts` | `test/authz-matrix.test.ts` | |
-| REQ-ROLE-003 | canReadPatient() | NOT_STARTED | `src/plugins/auth.ts` | `test/authz-matrix.test.ts` | |
-| REQ-ROLE-004 | canAppendPatient() | NOT_STARTED | `src/plugins/auth.ts` | `test/authz-matrix.test.ts` | |
-| REQ-ROLE-005 | fchv blocked from visits (route + sync) | NOT_STARTED | `src/plugins/auth.ts`, enforced in `visits/routes.ts` and `sync/service.ts` | `test/authz-matrix.test.ts` | Question 1 |
-| REQ-ROLE-006 | record_viewed throttled 10min | NOT_STARTED | `src/plugins/auth.ts` (`canReadPatient`) | `test/authz-matrix.test.ts` | |
+| REQ-AUTH-001 | Phone E.164 normalization | IMPLEMENTED | `src/modules/auth/schemas.ts` | `test/auth.test.ts` | backend validates shape only; UI normalization is frontend (OUT-OF-REPO) |
+| REQ-AUTH-002 | POST /auth/otp/request + rate limit | IMPLEMENTED | `src/modules/auth/routes.ts`, `service.ts`, `src/lib/rateLimiter.ts` | `test/auth.test.ts` | not TESTED/VERIFIED - no reachable Postgres/Redis in this sandbox, see Session 3 PROGRESS entry |
+| REQ-AUTH-003 | Demo OTP 123456 | IMPLEMENTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | gated on `OTP_MODE`, not `SMS_MODE` - backend.md A.4 vs §7.1 mismatch, see Session 3 PROGRESS entry |
+| REQ-AUTH-004 | POST /auth/otp/verify, tempToken | IMPLEMENTED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | |
+| REQ-AUTH-005 | POST /auth/pin/set (create + reset) | IMPLEMENTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | Question 2: also used for PIN reset |
+| REQ-AUTH-006 | POST /auth/pin/login + account lockout | IMPLEMENTED | `src/modules/auth/service.ts`, `src/lib/rateLimiter.ts` | `test/auth.test.ts` | Question 6: stacked with REQ-SEC-001's route limit |
+| REQ-AUTH-007 | POST /auth/refresh, rotation | IMPLEMENTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | reuse-detection revokes the whole token family, docs/SECURITY.md row 5 |
+| REQ-AUTH-008 | POST /auth/provider/activate | IMPLEMENTED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | `Facility`/`InviteCode` schema pulled forward from Phase 1 (hard FK dependency); seed script itself (REQ-SEED-001) still NOT_STARTED, tests use ad-hoc fixtures |
+| REQ-AUTH-009 | GET /me | IMPLEMENTED | `src/modules/auth/routes.ts` | `test/auth.test.ts` | |
+| REQ-AUTH-010 | Access token claims/signing | IMPLEMENTED | `src/lib/tokens.ts` | `test/auth.test.ts` | |
+| REQ-AUTH-011 | Refresh token hashed, revocable | IMPLEMENTED | `prisma/schema.prisma`, `src/modules/auth/service.ts`, `src/lib/hash.ts` | `test/auth.test.ts` | hashed with SHA-256, not argon2 - see Session 3 PROGRESS entry for why |
+| REQ-AUTH-012 | requireAuth() → 401 | IMPLEMENTED | `src/plugins/auth.ts` | `test/auth.test.ts` | |
+| REQ-AUTH-013 | Invite codes seeded | IMPLEMENTED (schema only) | `prisma/schema.prisma` | `test/auth.test.ts` (ad-hoc fixtures) | real seeding (`prisma/seed.ts`) is Phase 1, still NOT_STARTED |
+| REQ-ROLE-001 | Role enum | IMPLEMENTED | `prisma/schema.prisma` | — | |
+| REQ-ROLE-002 | requireRole() → 403 | IMPLEMENTED | `src/plugins/auth.ts` | `test/authz-matrix.test.ts` | |
+| REQ-ROLE-003 | canReadPatient() | NOT_STARTED | `src/modules/patients/service.ts` (was planned as `src/plugins/auth.ts`) | `test/authz-matrix.test.ts` | moved: queries the `Patient`/`AccessGrant` tables, which don't exist until Phase 3/4 - see Session 3 PROGRESS entry |
+| REQ-ROLE-004 | canAppendPatient() | NOT_STARTED | `src/modules/patients/service.ts` (was planned as `src/plugins/auth.ts`) | `test/authz-matrix.test.ts` | same Phase 3/4 dependency as REQ-ROLE-003 |
+| REQ-ROLE-005 | fchv blocked from visits (route + sync) | NOT_STARTED | `src/plugins/auth.ts`, enforced in `visits/routes.ts` and `sync/service.ts` | `test/authz-matrix.test.ts` | Question 1; depends on Phase 5 (visits)/6 (sync) existing |
+| REQ-ROLE-006 | record_viewed throttled 10min | NOT_STARTED | `src/modules/patients/service.ts` | `test/authz-matrix.test.ts` | depends on REQ-ROLE-003 and `AuditEntry` (Phase 1) existing |
 | REQ-ROLE-007 | GET /patients role scoping | NOT_STARTED | `src/modules/patients/routes.ts` | `test/patients.test.ts` | endpoint itself built in Phase 3; authorization primitive here |
-| REQ-ROLE-008 | Grant/access token type separation | NOT_STARTED | `src/plugins/auth.ts` | `test/auth.test.ts` | |
-| REQ-USER-001 | User entity fields | NOT_STARTED | `prisma/schema.prisma` | — | |
-| REQ-USER-002 | User serializer never leaks pinHash | NOT_STARTED | `src/lib/serializers.ts` | `test/auth.test.ts` | |
-| REQ-SEC-005 | Argon2id + refresh-token hashing | NOT_STARTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | |
+| REQ-ROLE-008 | Grant/access token type separation | IMPLEMENTED | `src/lib/tokens.ts` | `test/auth.test.ts`, `test/authz-matrix.test.ts` | grant-token half (`GRANT_SECRET`) still Phase 4; access/temp separation fully built and tested now |
+| REQ-USER-001 | User entity fields | IMPLEMENTED | `prisma/schema.prisma` | — | |
+| REQ-USER-002 | User serializer never leaks pinHash | IMPLEMENTED | `src/lib/serializers.ts` | `test/auth.test.ts` | whitelist-only DTO, never spreads the Prisma row |
+| REQ-SEC-005 | Argon2id + refresh-token hashing | IMPLEMENTED | `src/lib/hash.ts` | `test/auth.test.ts` | PIN: argon2id, cost configurable. Refresh token: SHA-256, not argon2 - deliberate deviation, see Session 3 PROGRESS entry |
 | REQ-AUTH-014 | Offline PIN unlock | OUT-OF-REPO (frontend) | — | — | frontend.md S04 |
 | REQ-AUTH-015 | Silent token refresh on launch | OUT-OF-REPO (frontend) | — | — | frontend.md S01 |
 | REQ-AUTH-016 | SQLCipher local DB encryption | OUT-OF-REPO (frontend) | — | — | frontend.md §6.1 |

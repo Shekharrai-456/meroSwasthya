@@ -19,6 +19,13 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": false
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "prisma/seed.ts", "prisma.config.ts", "generated/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "scripts/**/*.ts",
+    "prisma/seed.ts",
+    "prisma.config.ts",
+    "generated/**/*.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }
