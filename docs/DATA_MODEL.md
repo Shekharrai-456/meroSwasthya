@@ -112,6 +112,8 @@ Indexes: `@@index([ownerUserId])` — `GET /patients` owned-list (REQ-ROLE-007).
 
 Indexes: `@@index([patientId, redeemedByUserId, accessUntil])` — the exact tuple `canReadPatient`/`canAppendPatient` filter on (REQ-ROLE-003/004), on every authorized request.
 
+**Added index (Session 6 performance audit, not in the original plan):** `@@index([redeemedByUserId, revokedAt, accessUntil])`. REQ-ROLE-007's `GET /patients` list query (`modules/patients/service.ts`'s `listPatients`) looks up every active grant *for one actor across all patients* — filtered on `redeemedByUserId`/`revokedAt`/`accessUntil`, with no `patientId` in the `WHERE` clause at all. The first index can't serve that efficiently: a B-tree composite index only supports leftmost-prefix lookups, and `patientId` is its leading column. Found by reasoning through the real query patterns each index needs to serve, not by inspection of the schema alone - the original index was correct for `canReadPatient`'s per-patient check, just not for this actor-scoped list query added later in Session 4.
+
 ### Visit (REQ-VISIT-*)
 | Field | Type | Constraint |
 |---|---|---|

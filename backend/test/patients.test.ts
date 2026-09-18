@@ -10,6 +10,12 @@ import { countQueries } from './helpers/queryCount.js';
 
 // REQ-PATIENT-*, REQ-ROLE-003/004/006/007. Real Postgres + Redis throughout
 // (CLAUDE.md §10) - no mocked database.
+//
+// Session 6 frontend-contract audit finding: POST/GET-one/PATCH /patients
+// all wrap the entity as { "patient": <Patient> } per backend.md's own A.4
+// examples - a bug found here (assertions previously read `data.id`
+// directly) that also existed in the real route code until this session.
+// GET /patients (list) and GET /patients/:id/audit stay `{ items: [...] }`.
 
 function samplePatientBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -64,12 +70,12 @@ describe('patients module', () => {
   });
 
   describe('POST /api/v1/patients (REQ-PATIENT-001/002)', () => {
-    it('creates a patient with a client-generated id', async () => {
+    it('creates a patient with a client-generated id, wrapped as { patient }', async () => {
       const owner = await asUser(app, Role.patient);
       const body = samplePatientBody();
       const res = await owner.post('/api/v1/patients', body);
       expect(res.statusCode).toBe(200);
-      const patient = res.json().data;
+      const patient = res.json().data.patient;
       expect(patient.id).toBe(body.id);
       expect(patient.ownerUserId).toBe(owner.user.id);
       expect(patient.version).toBe(1);
@@ -84,7 +90,7 @@ describe('patients module', () => {
       const second = await owner.post('/api/v1/patients', body);
       expect(first.statusCode).toBe(200);
       expect(second.statusCode).toBe(200);
-      expect(second.json().data.version).toBe(1);
+      expect(second.json().data.patient.version).toBe(1);
       const count = await prisma.patient.count({ where: { id: body.id } });
       expect(count).toBe(1);
     });
@@ -105,8 +111,8 @@ describe('patients module', () => {
       delete (body as Record<string, unknown>).allergies;
       delete (body as Record<string, unknown>).chronicConditions;
       const res = await owner.post('/api/v1/patients', body);
-      expect(res.json().data.allergies).toEqual([]);
-      expect(res.json().data.chronicConditions).toEqual([]);
+      expect(res.json().data.patient.allergies).toEqual([]);
+      expect(res.json().data.patient.chronicConditions).toEqual([]);
     });
 
     it('401 with no token', async () => {
@@ -144,10 +150,10 @@ describe('patients module', () => {
     async function createPatient(owner: Awaited<ReturnType<typeof asUser>>) {
       const body = samplePatientBody();
       const res = await owner.post('/api/v1/patients', body);
-      return res.json().data as { id: string; version: number };
+      return res.json().data.patient as { id: string; version: number };
     }
 
-    it('updates fields and increments version', async () => {
+    it('updates fields and increments version, wrapped as { patient }', async () => {
       const owner = await asUser(app, Role.patient);
       const patient = await createPatient(owner);
       const res = await owner.patch(`/api/v1/patients/${patient.id}`, {
@@ -156,12 +162,12 @@ describe('patients module', () => {
         ward: 7,
       });
       expect(res.statusCode).toBe(200);
-      expect(res.json().data.name).toBe('Sita C. Updated');
-      expect(res.json().data.ward).toBe(7);
-      expect(res.json().data.version).toBe(2);
+      expect(res.json().data.patient.name).toBe('Sita C. Updated');
+      expect(res.json().data.patient.ward).toBe(7);
+      expect(res.json().data.patient.version).toBe(2);
     });
 
-    it('409 VERSION_CONFLICT on a stale version, with details.current the real row', async () => {
+    it('409 VERSION_CONFLICT on a stale version, with details.current the real row (bare, not wrapped)', async () => {
       const owner = await asUser(app, Role.patient);
       const patient = await createPatient(owner);
       await owner.patch(`/api/v1/patients/${patient.id}`, { version: 1, name: 'First edit' });
@@ -173,6 +179,9 @@ describe('patients module', () => {
       expect(res.statusCode).toBe(409);
       const body = res.json();
       expect(body.error.code).toBe('VERSION_CONFLICT');
+      // details.current is the bare entity (error-envelope convention,
+      // docs/API_CONTRACT.md §4) - deliberately NOT wrapped in { patient },
+      // unlike the success envelope.
       expect(body.error.details.current.version).toBe(2);
       expect(body.error.details.current.name).toBe('First edit');
     });
@@ -252,7 +261,7 @@ describe('patients module', () => {
       const provider = await asUser(app, Role.provider);
       const ownPatientRes = await provider.post('/api/v1/patients', samplePatientBody());
       const grantedPatientRes = await owner.post('/api/v1/patients', samplePatientBody());
-      await createGrant(grantedPatientRes.json().data.id, provider.user.id);
+      await createGrant(grantedPatientRes.json().data.patient.id, provider.user.id);
 
       // A third patient the provider has no relationship to at all.
       const otherOwner = await asUser(app, Role.patient);
@@ -261,8 +270,8 @@ describe('patients module', () => {
       const res = await provider.get('/api/v1/patients');
       const ids = res.json().data.items.map((p: { id: string }) => p.id);
       expect(ids).toHaveLength(2);
-      expect(ids).toContain(ownPatientRes.json().data.id);
-      expect(ids).toContain(grantedPatientRes.json().data.id);
+      expect(ids).toContain(ownPatientRes.json().data.patient.id);
+      expect(ids).toContain(grantedPatientRes.json().data.patient.id);
     });
 
     it('an expired or revoked grant does not appear in the provider list', async () => {
@@ -270,8 +279,8 @@ describe('patients module', () => {
       const provider = await asUser(app, Role.provider);
       const expiredPatient = await owner.post('/api/v1/patients', samplePatientBody());
       const revokedPatient = await owner.post('/api/v1/patients', samplePatientBody());
-      await createGrant(expiredPatient.json().data.id, provider.user.id, { expired: true });
-      await createGrant(revokedPatient.json().data.id, provider.user.id, { revoked: true });
+      await createGrant(expiredPatient.json().data.patient.id, provider.user.id, { expired: true });
+      await createGrant(revokedPatient.json().data.patient.id, provider.user.id, { revoked: true });
 
       const res = await provider.get('/api/v1/patients');
       expect(res.json().data.items).toHaveLength(0);
@@ -305,19 +314,19 @@ describe('patients module', () => {
   });
 
   describe('GET /api/v1/patients/:id (REQ-PATIENT-004, REQ-ROLE-003, REQ-ROLE-006)', () => {
-    it('owner can read their own patient', async () => {
+    it('owner can read their own patient, wrapped as { patient }', async () => {
       const owner = await asUser(app, Role.patient);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      const res = await owner.get(`/api/v1/patients/${created.json().data.id}`);
+      const res = await owner.get(`/api/v1/patients/${created.json().data.patient.id}`);
       expect(res.statusCode).toBe(200);
-      expect(res.json().data.id).toBe(created.json().data.id);
+      expect(res.json().data.patient.id).toBe(created.json().data.patient.id);
     });
 
     it('403 FORBIDDEN for a provider with no grant (object-level boundary)', async () => {
       const owner = await asUser(app, Role.patient);
       const provider = await asUser(app, Role.provider);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      const res = await provider.get(`/api/v1/patients/${created.json().data.id}`);
+      const res = await provider.get(`/api/v1/patients/${created.json().data.patient.id}`);
       expect(res.statusCode).toBe(403);
     });
 
@@ -325,7 +334,7 @@ describe('patients module', () => {
       const owner = await asUser(app, Role.patient);
       const provider = await asUser(app, Role.provider);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      const patientId = created.json().data.id;
+      const patientId = created.json().data.patient.id;
       await createGrant(patientId, provider.user.id);
 
       const allowed = await provider.get(`/api/v1/patients/${patientId}`);
@@ -343,7 +352,7 @@ describe('patients module', () => {
       const owner = await asUser(app, Role.patient);
       const provider = await asUser(app, Role.provider);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      const patientId = created.json().data.id;
+      const patientId = created.json().data.patient.id;
       await createGrant(patientId, provider.user.id, { revoked: true });
 
       const res = await provider.get(`/api/v1/patients/${patientId}`);
@@ -354,7 +363,7 @@ describe('patients module', () => {
       const owner = await asUser(app, Role.patient);
       const fchv = await asUser(app, Role.fchv);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      const patientId = created.json().data.id;
+      const patientId = created.json().data.patient.id;
 
       const denied = await fchv.get(`/api/v1/patients/${patientId}`);
       expect(denied.statusCode).toBe(403);
@@ -379,7 +388,7 @@ describe('patients module', () => {
       const owner = await asUser(app, Role.patient);
       const provider = await asUser(app, Role.provider);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      const patientId = created.json().data.id;
+      const patientId = created.json().data.patient.id;
       await createGrant(patientId, provider.user.id);
 
       await provider.get(`/api/v1/patients/${patientId}`);
@@ -396,7 +405,7 @@ describe('patients module', () => {
     it('the owner reading their own record never writes a record_viewed audit row', async () => {
       const owner = await asUser(app, Role.patient);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      await owner.get(`/api/v1/patients/${created.json().data.id}`);
+      await owner.get(`/api/v1/patients/${created.json().data.patient.id}`);
 
       const entries = await prisma.auditEntry.findMany({ where: { action: 'record_viewed' } });
       expect(entries).toHaveLength(0);
@@ -408,7 +417,7 @@ describe('patients module', () => {
       const owner = await asUser(app, Role.patient);
       const provider = await asUser(app, Role.provider);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      const patientId = created.json().data.id;
+      const patientId = created.json().data.patient.id;
       await createGrant(patientId, provider.user.id);
       await provider.get(`/api/v1/patients/${patientId}`);
 
@@ -424,7 +433,7 @@ describe('patients module', () => {
       const owner = await asUser(app, Role.patient);
       const provider = await asUser(app, Role.provider);
       const created = await owner.post('/api/v1/patients', samplePatientBody());
-      const patientId = created.json().data.id;
+      const patientId = created.json().data.patient.id;
       await createGrant(patientId, provider.user.id);
 
       const res = await provider.get(`/api/v1/patients/${patientId}/audit`);
@@ -450,7 +459,7 @@ describe('patients module', () => {
 
       const createRes = await owner.post('/api/v1/patients', samplePatientBody());
       expect(createRes.statusCode).toBe(200);
-      const patientId = createRes.json().data.id;
+      const patientId = createRes.json().data.patient.id;
 
       await createGrant(patientId, provider.user.id, { scope: GrantScope.append });
 
@@ -467,7 +476,7 @@ describe('patients module', () => {
         ward: 9,
       });
       expect(editRes.statusCode).toBe(200);
-      expect(editRes.json().data.version).toBe(2);
+      expect(editRes.json().data.patient.version).toBe(2);
 
       const staleRes = await owner.patch(`/api/v1/patients/${patientId}`, {
         version: 1,
@@ -476,7 +485,7 @@ describe('patients module', () => {
       expect(staleRes.statusCode).toBe(409);
 
       const finalRes = await owner.get(`/api/v1/patients/${patientId}`);
-      expect(finalRes.json().data.ward).toBe(9);
+      expect(finalRes.json().data.patient.ward).toBe(9);
     });
   });
 });

@@ -33,7 +33,7 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-CODELIST-002 | CodeListItem fields | NOT_STARTED | `prisma/schema.prisma` | `test/codelists.test.ts` | |
 | REQ-META-001 | GET /rules serves RULES verbatim | NOT_STARTED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | depends on `rules.json` existing (Phase 6) |
 | REQ-META-002 | GET /config feature flags | NOT_STARTED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | |
-| REQ-AUDIT-001 | AuditEntry written on 7 actions | IMPLEMENTED (partial) | `src/modules/audit/service.ts` (`logAudit`), called from `src/plugins/auth.ts` | `test/patients.test.ts` | only `record_viewed` is wired up (Session 4); the other 6 actions (`grant_created`, `grant_redeemed`, `visit_added`, `contact_recorded`, `document_added`, `grant_revoked`) get their `logAudit()` call sites when their own modules (Phase 4/5/7/9) are built |
+| REQ-AUDIT-001 | AuditEntry written on 7 actions | IMPLEMENTED (partial) | `src/modules/audit/service.ts` (`logAudit`), called from `src/plugins/auth.ts` and `src/modules/grants/service.ts` | `test/patients.test.ts`, `test/grants.test.ts` | Session 6 correction: 4 of 7 actions are wired up (`record_viewed` since Session 4; `grant_created`/`grant_redeemed`/`grant_revoked` since Session 5, previously not reflected here). The remaining 3 (`visit_added`, `contact_recorded`, `document_added`) get their call sites when Visits/Maternal/Documents (Phase 5/7/9) are built |
 | REQ-AUDIT-002 | Audit rows immutable | IMPLEMENTED | `prisma/schema.prisma` (no `deleted` field, no update/delete code path on AuditEntry anywhere) | — | structurally enforced (nothing in the codebase can modify a row); no dedicated test since there's no code path to test against |
 | REQ-AUDIT-003 | GET /patients/:id/audit, owner-only | NOT_STARTED | `src/modules/patients/routes.ts` | `test/patients.test.ts` | endpoint lives in Patients module; row here since it's fundamentally an audit-read concern |
 | REQ-SEED-001 | Seed facilities/invites/users/patients/visits/pregnancy/sms | NOT_STARTED | `prisma/seed.ts` | manual: `npm run seed` then inspect | |
@@ -44,30 +44,30 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-AUTH-001 | Phone E.164 normalization | TESTED | `src/modules/auth/schemas.ts` | `test/auth.test.ts` | backend validates shape only; UI normalization is frontend (OUT-OF-REPO) |
-| REQ-AUTH-002 | POST /auth/otp/request + rate limit | TESTED | `src/modules/auth/routes.ts`, `service.ts`, `src/lib/rateLimiter.ts` | `test/auth.test.ts` | passes against a real Postgres + Redis (Session 3 continued) |
-| REQ-AUTH-003 | Demo OTP 123456 | TESTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | gated on `OTP_MODE`, not `SMS_MODE` - backend.md A.4 vs §7.1 mismatch, see Session 3 PROGRESS entry |
-| REQ-AUTH-004 | POST /auth/otp/verify, tempToken | TESTED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-005 | POST /auth/pin/set (create + reset) | TESTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | Question 2: also used for PIN reset |
-| REQ-AUTH-006 | POST /auth/pin/login + account lockout | TESTED | `src/modules/auth/service.ts`, `src/lib/rateLimiter.ts` | `test/auth.test.ts` | Question 6: stacked with REQ-SEC-001's route limit |
-| REQ-AUTH-007 | POST /auth/refresh, rotation | TESTED | `src/modules/auth/service.ts` | `test/auth.test.ts` | reuse-detection revokes the whole token family, docs/SECURITY.md row 5 |
-| REQ-AUTH-008 | POST /auth/provider/activate | TESTED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | `Facility`/`InviteCode` schema pulled forward from Phase 1 (hard FK dependency); seed script itself (REQ-SEED-001) still NOT_STARTED, tests use ad-hoc fixtures |
-| REQ-AUTH-009 | GET /me | TESTED | `src/modules/auth/routes.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-010 | Access token claims/signing | TESTED | `src/lib/tokens.ts` | `test/auth.test.ts` | |
-| REQ-AUTH-011 | Refresh token hashed, revocable | TESTED | `prisma/schema.prisma`, `src/modules/auth/service.ts`, `src/lib/hash.ts` | `test/auth.test.ts` | hashed with SHA-256, not argon2 - see Session 3 PROGRESS entry for why |
-| REQ-AUTH-012 | requireAuth() → 401 | TESTED | `src/plugins/auth.ts` | `test/auth.test.ts` | |
+| REQ-AUTH-001 | Phone E.164 normalization | VERIFIED | `src/modules/auth/schemas.ts` | `test/auth.test.ts` | backend validates shape only; UI normalization is frontend (OUT-OF-REPO) |
+| REQ-AUTH-002 | POST /auth/otp/request + rate limit | VERIFIED | `src/modules/auth/routes.ts`, `service.ts`, `src/lib/rateLimiter.ts` | `test/auth.test.ts` | passes against a real Postgres + Redis; route-by-route auth gate re-confirmed in Session 6's security review |
+| REQ-AUTH-003 | Demo OTP 123456 | VERIFIED | `src/modules/auth/service.ts` | `test/auth.test.ts` | gated on `OTP_MODE`, not `SMS_MODE` - backend.md A.4 vs §7.1 mismatch, see Session 3 PROGRESS entry |
+| REQ-AUTH-004 | POST /auth/otp/verify, tempToken | VERIFIED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | |
+| REQ-AUTH-005 | POST /auth/pin/set (create + reset) | VERIFIED | `src/modules/auth/service.ts` | `test/auth.test.ts` | Question 2: also used for PIN reset |
+| REQ-AUTH-006 | POST /auth/pin/login + account lockout | VERIFIED | `src/modules/auth/service.ts`, `src/lib/rateLimiter.ts` | `test/auth.test.ts` | Question 6: stacked with REQ-SEC-001's route limit |
+| REQ-AUTH-007 | POST /auth/refresh, rotation | VERIFIED | `src/modules/auth/service.ts` | `test/auth.test.ts` | reuse-detection revokes the whole token family, docs/SECURITY.md row 5 |
+| REQ-AUTH-008 | POST /auth/provider/activate | VERIFIED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | `Facility`/`InviteCode` schema pulled forward from Phase 1 (hard FK dependency); seed script itself (REQ-SEED-001) still NOT_STARTED, tests use ad-hoc fixtures |
+| REQ-AUTH-009 | GET /me | VERIFIED | `src/modules/auth/routes.ts` | `test/auth.test.ts` | |
+| REQ-AUTH-010 | Access token claims/signing | VERIFIED | `src/lib/tokens.ts` | `test/auth.test.ts` | Session 6: confirmed `algorithms:['HS256']` enforced on every verify path |
+| REQ-AUTH-011 | Refresh token hashed, revocable | VERIFIED | `prisma/schema.prisma`, `src/modules/auth/service.ts`, `src/lib/hash.ts` | `test/auth.test.ts` | hashed with SHA-256, not argon2 - see Session 3 PROGRESS entry for why |
+| REQ-AUTH-012 | requireAuth() → 401 | VERIFIED | `src/plugins/auth.ts` | `test/auth.test.ts` | |
 | REQ-AUTH-013 | Invite codes seeded | IMPLEMENTED (schema only) | `prisma/schema.prisma` | `test/auth.test.ts` (ad-hoc fixtures, passing) | real seeding (`prisma/seed.ts`) is Phase 1, still NOT_STARTED |
 | REQ-ROLE-001 | Role enum | IMPLEMENTED | `prisma/schema.prisma` | — | exercised indirectly by every auth test; no dedicated test file |
-| REQ-ROLE-002 | requireRole() → 403 | TESTED | `src/plugins/auth.ts` | `test/authz-matrix.test.ts` | |
+| REQ-ROLE-002 | requireRole() → 403 | VERIFIED | `src/plugins/auth.ts` | `test/authz-matrix.test.ts` | |
 | REQ-ROLE-003 | canReadPatient() | VERIFIED | `src/plugins/auth.ts` (built where originally planned - not moved after all, see Session 4 PROGRESS entry) | `test/patients.test.ts` | owner OR active unrevoked unexpired redeemed grant |
 | REQ-ROLE-004 | canAppendPatient() | VERIFIED | `src/plugins/auth.ts` | `test/patients.test.ts` | canReadPatient AND scope=append; owner always passes regardless of scope |
 | REQ-ROLE-005 | fchv blocked from visits (route + sync) | NOT_STARTED | `src/plugins/auth.ts`, enforced in `visits/routes.ts` and `sync/service.ts` | `test/authz-matrix.test.ts` | Question 1; depends on Phase 5 (visits)/6 (sync) existing |
 | REQ-ROLE-006 | record_viewed throttled 10min | VERIFIED | `src/plugins/auth.ts` (`assertCanReadPatient`), `src/modules/audit/service.ts` | `test/patients.test.ts` | fires only for provider/fchv actors, throttled via a query on AuditEntry's own recent rows, not a separate counter |
 | REQ-ROLE-007 | GET /patients role scoping | VERIFIED | `src/modules/patients/routes.ts`, `service.ts` | `test/patients.test.ts` | patient role: owned only. provider/fchv/admin: owned union active-grant patients |
-| REQ-ROLE-008 | Grant/access token type separation | TESTED | `src/lib/tokens.ts` | `test/auth.test.ts`, `test/authz-matrix.test.ts` | grant-token half (`GRANT_SECRET`) still Phase 4; access/temp separation fully built and tested now |
+| REQ-ROLE-008 | Grant/access token type separation | VERIFIED | `src/lib/tokens.ts` | `test/auth.test.ts`, `test/authz-matrix.test.ts` | grant-token half now built too (Session 5) and uses a separate `GRANT_SECRET`, enforced never-equal-to-`JWT_SECRET` at startup (Session 6 finding) |
 | REQ-USER-001 | User entity fields | IMPLEMENTED | `prisma/schema.prisma` | — | exercised indirectly by every auth test; no dedicated test file |
-| REQ-USER-002 | User serializer never leaks pinHash | TESTED | `src/lib/serializers.ts` | `test/auth.test.ts` | whitelist-only DTO, never spreads the Prisma row |
-| REQ-SEC-005 | Argon2id + refresh-token hashing | TESTED | `src/lib/hash.ts` | `test/auth.test.ts` | PIN: argon2id, cost configurable. Refresh token: SHA-256, not argon2 - deliberate deviation, see Session 3 PROGRESS entry |
+| REQ-USER-002 | User serializer never leaks pinHash | VERIFIED | `src/lib/serializers.ts` | `test/auth.test.ts` | whitelist-only DTO, never spreads the Prisma row; re-confirmed via grep in Session 6's security review |
+| REQ-SEC-005 | Argon2id + refresh-token hashing | VERIFIED | `src/lib/hash.ts` | `test/auth.test.ts` | PIN: argon2id, cost configurable. Refresh token: SHA-256, not argon2 - deliberate deviation, see Session 3 PROGRESS entry |
 | REQ-AUTH-014 | Offline PIN unlock | OUT-OF-REPO (frontend) | — | — | frontend.md S04 |
 | REQ-AUTH-015 | Silent token refresh on launch | OUT-OF-REPO (frontend) | — | — | frontend.md S01 |
 | REQ-AUTH-016 | SQLCipher local DB encryption | OUT-OF-REPO (frontend) | — | — | frontend.md §6.1 |
@@ -221,11 +221,13 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 ## Phase 10 — Hardening & production readiness (Session 6)
 
+**Session 6 ran the full audit this phase describes** (security review, frontend-contract verification, performance pass, production-readiness pass) **against everything built so far** (Foundation/Auth/Patients/Grants) - see `docs/FINAL_AUDIT.md` for the complete requirement-by-requirement result and `docs/PROGRESS.md`'s Session 6 entry for the findings and fixes. The individual rows below stay `NOT_STARTED` because their specific deliverables (a dedicated smoke-test script, the Documents module's magic-byte check, the frontend's own acceptance run) don't exist yet or depend on modules that aren't built - not because the audit itself didn't happen. This phase will need re-running once Visits/Sync/Maternal/Reminders/Documents/Facilities land, since most of `docs/SECURITY.md`'s rows are only "not applicable yet" today, not verified against real code.
+
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-TEST-004 | End-to-end smoke script | NOT_STARTED | `scripts/smoke.sh` or `test/smoke.test.ts` | (is the test) | exercises every phase above together |
-| — | CORS tightening follow-up | NOT_STARTED | `src/config.ts` | manual | `docs/SECURITY.md` row 13 — only relevant past the hackathon demo |
-| — | Magic-byte upload check follow-up | NOT_STARTED | `src/modules/documents/service.ts` | `test/documents.test.ts` | `docs/SECURITY.md` row 16 — documented gap, not yet built |
+| REQ-TEST-004 | End-to-end smoke script | NOT_STARTED | `scripts/smoke.sh` or `test/smoke.test.ts` | (is the test) | exercises every phase above together; `test/patients.test.ts`/`test/grants.test.ts`'s own integration tests cover the equivalent ground for what's built so far, but there's no dedicated cross-module script |
+| — | CORS tightening follow-up | NOT_STARTED | `src/config.ts` | manual | `docs/SECURITY.md` row 13 — only relevant past the hackathon demo; now documented as an explicit pre-deployment step in `README.md`'s Deployment notes |
+| — | Magic-byte upload check follow-up | NOT_STARTED | `src/modules/documents/service.ts` | `test/documents.test.ts` | `docs/SECURITY.md` row 16 — documented gap, not yet built (Documents module itself doesn't exist) |
 | REQ-TEST-006 | Frontend acceptance checklist | OUT-OF-REPO (frontend) | — | — | frontend.md §17 |
 
 ## Not in this plan (Tier 2/3, out of the 32-hour Tier-1 build)

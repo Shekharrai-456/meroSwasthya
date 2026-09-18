@@ -24,6 +24,16 @@ export const patientListResponseSchema = z.object({
   items: z.array(patientDtoSchema),
 });
 
+// Session 6 frontend-contract audit finding: backend.md's own A.4 examples
+// wrap every single-patient response as { "patient": <Patient> } (POST
+// /patients, GET /patients/:id, PATCH /patients/:id) - the routes
+// previously returned the bare patient object instead, which would have
+// broken any real frontend expecting `data.patient.id`. Fixed here and in
+// routes.ts together; see docs/PROGRESS.md's Session 6 entry.
+export const patientWrapperResponseSchema = z.object({
+  patient: patientDtoSchema,
+});
+
 export const auditEntryDtoSchema = z.object({
   id: z.string(),
   patientId: z.string(),

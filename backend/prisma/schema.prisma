@@ -168,6 +168,14 @@ model AccessGrant {
   createdAt        DateTime   @default(now()) @map("created_at")
 
   @@index([patientId, redeemedByUserId, accessUntil])
+  // Session 6 performance audit finding: REQ-ROLE-007's GET /patients list
+  // query (modules/patients/service.ts's listPatients) filters AccessGrant
+  // by redeemedByUserId/revokedAt/accessUntil WITHOUT patientId - the index
+  // above can't serve that as an efficient range scan, since a B-tree
+  // composite index only supports leftmost-prefix lookups and patientId is
+  // its leading column. This second index leads with redeemedByUserId to
+  // cover that actor-scoped access pattern.
+  @@index([redeemedByUserId, revokedAt, accessUntil])
   @@map("access_grants")
 }
 

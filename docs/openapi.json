@@ -732,79 +732,88 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "ownerUserId": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "sex": {
-                          "type": "string",
-                          "enum": [
-                            "female",
-                            "male",
-                            "other"
-                          ]
-                        },
-                        "dob": {
-                          "type": "string"
-                        },
-                        "bloodGroup": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "ward": {
-                          "nullable": true,
-                          "type": "number"
-                        },
-                        "municipality": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "allergies": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "chronicConditions": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "emergencyContactPhone": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "version": {
-                          "type": "number"
-                        },
-                        "updatedAt": {
-                          "type": "string"
-                        },
-                        "deleted": {
-                          "type": "boolean"
+                        "patient": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "ownerUserId": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "sex": {
+                              "type": "string",
+                              "enum": [
+                                "female",
+                                "male",
+                                "other"
+                              ]
+                            },
+                            "dob": {
+                              "type": "string"
+                            },
+                            "bloodGroup": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "ward": {
+                              "nullable": true,
+                              "type": "number"
+                            },
+                            "municipality": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "allergies": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "chronicConditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "emergencyContactPhone": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ownerUserId",
+                            "name",
+                            "sex",
+                            "dob",
+                            "bloodGroup",
+                            "ward",
+                            "municipality",
+                            "allergies",
+                            "chronicConditions",
+                            "emergencyContactPhone",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
-                        "id",
-                        "ownerUserId",
-                        "name",
-                        "sex",
-                        "dob",
-                        "bloodGroup",
-                        "ward",
-                        "municipality",
-                        "allergies",
-                        "chronicConditions",
-                        "emergencyContactPhone",
-                        "version",
-                        "updatedAt",
-                        "deleted"
+                        "patient"
                       ],
                       "additionalProperties": false
                     }
@@ -968,79 +977,88 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "ownerUserId": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "sex": {
-                          "type": "string",
-                          "enum": [
-                            "female",
-                            "male",
-                            "other"
-                          ]
-                        },
-                        "dob": {
-                          "type": "string"
-                        },
-                        "bloodGroup": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "ward": {
-                          "nullable": true,
-                          "type": "number"
-                        },
-                        "municipality": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "allergies": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "chronicConditions": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "emergencyContactPhone": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "version": {
-                          "type": "number"
-                        },
-                        "updatedAt": {
-                          "type": "string"
-                        },
-                        "deleted": {
-                          "type": "boolean"
+                        "patient": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "ownerUserId": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "sex": {
+                              "type": "string",
+                              "enum": [
+                                "female",
+                                "male",
+                                "other"
+                              ]
+                            },
+                            "dob": {
+                              "type": "string"
+                            },
+                            "bloodGroup": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "ward": {
+                              "nullable": true,
+                              "type": "number"
+                            },
+                            "municipality": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "allergies": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "chronicConditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "emergencyContactPhone": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ownerUserId",
+                            "name",
+                            "sex",
+                            "dob",
+                            "bloodGroup",
+                            "ward",
+                            "municipality",
+                            "allergies",
+                            "chronicConditions",
+                            "emergencyContactPhone",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
-                        "id",
-                        "ownerUserId",
-                        "name",
-                        "sex",
-                        "dob",
-                        "bloodGroup",
-                        "ward",
-                        "municipality",
-                        "allergies",
-                        "chronicConditions",
-                        "emergencyContactPhone",
-                        "version",
-                        "updatedAt",
-                        "deleted"
+                        "patient"
                       ],
                       "additionalProperties": false
                     }
@@ -1156,79 +1174,88 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "ownerUserId": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "sex": {
-                          "type": "string",
-                          "enum": [
-                            "female",
-                            "male",
-                            "other"
-                          ]
-                        },
-                        "dob": {
-                          "type": "string"
-                        },
-                        "bloodGroup": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "ward": {
-                          "nullable": true,
-                          "type": "number"
-                        },
-                        "municipality": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "allergies": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "chronicConditions": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "emergencyContactPhone": {
-                          "nullable": true,
-                          "type": "string"
-                        },
-                        "version": {
-                          "type": "number"
-                        },
-                        "updatedAt": {
-                          "type": "string"
-                        },
-                        "deleted": {
-                          "type": "boolean"
+                        "patient": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "ownerUserId": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "sex": {
+                              "type": "string",
+                              "enum": [
+                                "female",
+                                "male",
+                                "other"
+                              ]
+                            },
+                            "dob": {
+                              "type": "string"
+                            },
+                            "bloodGroup": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "ward": {
+                              "nullable": true,
+                              "type": "number"
+                            },
+                            "municipality": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "allergies": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "chronicConditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "emergencyContactPhone": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ownerUserId",
+                            "name",
+                            "sex",
+                            "dob",
+                            "bloodGroup",
+                            "ward",
+                            "municipality",
+                            "allergies",
+                            "chronicConditions",
+                            "emergencyContactPhone",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
-                        "id",
-                        "ownerUserId",
-                        "name",
-                        "sex",
-                        "dob",
-                        "bloodGroup",
-                        "ward",
-                        "municipality",
-                        "allergies",
-                        "chronicConditions",
-                        "emergencyContactPhone",
-                        "version",
-                        "updatedAt",
-                        "deleted"
+                        "patient"
                       ],
                       "additionalProperties": false
                     }

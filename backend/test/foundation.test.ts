@@ -126,4 +126,27 @@ describe('config validation', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  // Session 6 security audit finding (docs/SECURITY.md row 4): a grant token
+  // must never be usable as a bearer access token, even if someone
+  // accidentally configures the same value for both secrets.
+  it('rejects JWT_SECRET and GRANT_SECRET being equal', () => {
+    const sameSecret = 'a'.repeat(32);
+    const result = parseConfig({
+      DATABASE_URL: 'postgresql://x/y',
+      TEST_DATABASE_URL: 'postgresql://x/y_test',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_SECRET: sameSecret,
+      GRANT_SECRET: sameSecret,
+      S3_ENDPOINT: 'http://localhost:9000',
+      S3_PUBLIC_ENDPOINT: 'http://localhost:9000',
+      S3_BUCKET: 'bucket',
+      S3_ACCESS_KEY: 'x',
+      S3_SECRET_KEY: 'y',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues.some((i) => i.startsWith('GRANT_SECRET'))).toBe(true);
+    }
+  });
 });

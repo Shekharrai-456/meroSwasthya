@@ -4,8 +4,8 @@ import { docSchema, noopSerializerCompiler, noopValidatorCompiler } from '../../
 import { assertCanReadPatient, getAuthenticatedUser, requireAuth } from '../../plugins/auth.js';
 import {
   auditListResponseSchema,
-  patientDtoSchema,
   patientListResponseSchema,
+  patientWrapperResponseSchema,
 } from './docSchemas.js';
 import { patientCreateSchema, patientUpdateSchema } from './schemas.js';
 import * as patientsService from './service.js';
@@ -29,13 +29,13 @@ export async function patientsRoutes(app: FastifyInstance): Promise<void> {
           'REQ-PATIENT-001/002. Client-generated id; posting the same id twice is idempotent for its owner, FORBIDDEN for anyone else.',
         tags: ['patients'],
         body: patientCreateSchema,
-        response200: patientDtoSchema,
+        response200: patientWrapperResponseSchema,
       }),
     },
     async (request, reply) => {
       const input = patientCreateSchema.parse(request.body);
       const patient = await patientsService.createPatient(getAuthenticatedUser(request), input);
-      return reply.ok(patient);
+      return reply.ok({ patient });
     },
   );
 
@@ -69,7 +69,7 @@ export async function patientsRoutes(app: FastifyInstance): Promise<void> {
         description:
           'REQ-PATIENT-004. canRead-gated (REQ-ROLE-003). Patient entity only - no summary block yet, see docs/PROGRESS.md Session 4 entry.',
         tags: ['patients'],
-        response200: patientDtoSchema,
+        response200: patientWrapperResponseSchema,
       }),
     },
     async (request, reply) => {
@@ -83,7 +83,7 @@ export async function patientsRoutes(app: FastifyInstance): Promise<void> {
       // inspection - see docs/PROGRESS.md's Session 4 entry).
       const patient = await patientsService.getPatient(id);
       await assertCanReadPatient(actor, id);
-      return reply.ok(patient);
+      return reply.ok({ patient });
     },
   );
 
@@ -99,14 +99,14 @@ export async function patientsRoutes(app: FastifyInstance): Promise<void> {
           'REQ-PATIENT-003. Optimistic concurrency via `version`; mismatch -> 409 VERSION_CONFLICT.',
         tags: ['patients'],
         body: patientUpdateSchema,
-        response200: patientDtoSchema,
+        response200: patientWrapperResponseSchema,
       }),
     },
     async (request, reply) => {
       const { id } = patientIdParamsSchema.parse(request.params);
       const input = patientUpdateSchema.parse(request.body);
       const patient = await patientsService.updatePatient(getAuthenticatedUser(request), id, input);
-      return reply.ok(patient);
+      return reply.ok({ patient });
     },
   );
 

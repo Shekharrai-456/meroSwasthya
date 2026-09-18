@@ -53,8 +53,11 @@ describe('grants module', () => {
   });
 
   async function createPatientAs(owner: Awaited<ReturnType<typeof asUser>>) {
+    // Session 6 frontend-contract audit finding: POST /patients wraps its
+    // response as { patient: <Patient> } per backend.md's A.4 examples - this
+    // helper (and the real route) previously assumed the bare shape.
     const res = await owner.post('/api/v1/patients', samplePatientBody());
-    return res.json().data as { id: string };
+    return res.json().data.patient as { id: string };
   }
 
   describe('POST /api/v1/grants (REQ-GRANT-001/002)', () => {
