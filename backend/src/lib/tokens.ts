@@ -4,11 +4,12 @@ import { config } from '../config.js';
 import { AppError, ErrorCode } from './errors.js';
 
 // docs/API_CONTRACT.md §2 / docs/SECURITY.md row 4 (REQ-AUTH-010, REQ-ROLE-008).
-// Access and temp tokens share JWT_SECRET (grant tokens, Phase 4, use the
-// separate GRANT_SECRET) but are never interchangeable: `typ` is checked on
-// every verify, and `algorithms: ['HS256']` is passed explicitly so jose
-// rejects `alg:"none"` or any other algorithm outright.
+// Access and temp tokens share JWT_SECRET; grant tokens (Session 5) use the
+// separate GRANT_SECRET - never interchangeable: `typ` is checked on every
+// verify, and `algorithms: ['HS256']` is passed explicitly so jose rejects
+// `alg:"none"` or any other algorithm outright.
 const JWT_SECRET = new TextEncoder().encode(config.JWT_SECRET);
+const GRANT_SECRET = new TextEncoder().encode(config.GRANT_SECRET);
 
 // Fixed by backend.md §7.1 step 2 - not configurable, unlike ACCESS_TOKEN_TTL/
 // REFRESH_TOKEN_TTL which vary by deployment.
@@ -86,4 +87,53 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
 
 export async function verifyTempToken(token: string): Promise<TempTokenPayload> {
   return verifyTyped<TempTokenPayload>(token, 'temp');
+}
+
+// REQ-GRANT-001/002. Grant tokens have no `sub` claim (backend.md §7.2's
+// literal claim list is {typ, gid, pid, scope, exp} - unlike access/temp
+// tokens, there's no user identity being asserted, just "this specific grant
+// row, for this patient, with this scope") - verifyTyped's `sub` requirement
+// doesn't apply, so this is a separate, parallel verify path rather than a
+// call to verifyTyped.
+export interface GrantTokenPayload {
+  typ: 'grant';
+  gid: string;
+  pid: string;
+  scope: string;
+}
+
+export async function signGrantToken(
+  input: { gid: string; pid: string; scope: string },
+  ttlMinutes: number,
+): Promise<string> {
+  return new SignJWT({ typ: 'grant', gid: input.gid, pid: input.pid, scope: input.scope })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(`${ttlMinutes}m`)
+    .sign(GRANT_SECRET);
+}
+
+// Every failure mode (expired, malformed, tampered signature, wrong secret)
+// maps to the same GRANT_EXPIRED code - docs/API_CONTRACT.md's error table
+// only defines one code for "this grant token isn't usable", and not
+// distinguishing "tampered" from "expired" in the response is itself a
+// defensible security choice (no extra information handed to an attacker
+// probing what's wrong with a forged token).
+export async function verifyGrantToken(token: string): Promise<GrantTokenPayload> {
+  let payload: Record<string, unknown>;
+  try {
+    const result = await jwtVerify(token, GRANT_SECRET, { algorithms: ['HS256'] });
+    payload = result.payload;
+  } catch {
+    throw new AppError(ErrorCode.GRANT_EXPIRED, 'Grant token is invalid or expired');
+  }
+  if (
+    payload.typ !== 'grant' ||
+    typeof payload.gid !== 'string' ||
+    typeof payload.pid !== 'string' ||
+    typeof payload.scope !== 'string'
+  ) {
+    throw new AppError(ErrorCode.GRANT_EXPIRED, 'Grant token is invalid or expired');
+  }
+  return payload as unknown as GrantTokenPayload;
 }

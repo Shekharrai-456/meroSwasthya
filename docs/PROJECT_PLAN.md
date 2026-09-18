@@ -95,21 +95,21 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 ## Phase 4 — Access Grants (QR)
 
-**Schema pulled forward into Session 4 (Patients):** the `AccessGrant` table (`prisma/schema.prisma`) already exists - it's a hard dependency of `canReadPatient`/`canAppendPatient` (REQ-ROLE-003/004). Only the table; no `/grants` routes, QR token signing, or redeem flow exist yet, so every row below stays NOT_STARTED.
+**Schema pulled forward into Session 4 (Patients):** the `AccessGrant` table (`prisma/schema.prisma`) already existed going into this session - it was a hard dependency of `canReadPatient`/`canAppendPatient` (REQ-ROLE-003/004). Session 5 (this one) builds the actual `/grants` routes, QR token signing, and redeem flow against that existing table - no new migration needed.
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-GRANT-001 | POST /grants create + rate limit | NOT_STARTED | `src/modules/grants/routes.ts`, `service.ts` | `test/grants.test.ts` | |
-| REQ-GRANT-002 | qrPayload = "SWC1:" + token | NOT_STARTED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
-| REQ-GRANT-003 | POST /grants/redeem, role check | NOT_STARTED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
-| REQ-GRANT-004 | Expired/revoked → GRANT_EXPIRED | NOT_STARTED | `src/modules/grants/service.ts` | `test/grants.test.ts` | A.6#15 |
-| REQ-GRANT-005 | Same-user idempotent / other-user 409 | NOT_STARTED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
-| REQ-GRANT-006 | Redeem sets accessUntil, audits | NOT_STARTED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
-| REQ-GRANT-007 | Redeem returns full offline bundle | NOT_STARTED | `src/modules/grants/service.ts` | `test/grants.test.ts` | depends on Phase 3 summary/timeline |
-| REQ-GRANT-008 | POST /grants/:id/revoke | NOT_STARTED | `src/modules/grants/routes.ts`, `service.ts` | `test/grants.test.ts` | |
-| REQ-GRANT-009 | 24h access window enforced on every call | NOT_STARTED | `src/plugins/auth.ts` (`canReadPatient`) | `test/grants.test.ts` | A.6#16 |
+| REQ-GRANT-001 | POST /grants create + rate limit | VERIFIED | `src/modules/grants/routes.ts`, `service.ts` | `test/grants.test.ts` | |
+| REQ-GRANT-002 | qrPayload = "SWC1:" + token | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
+| REQ-GRANT-003 | POST /grants/redeem, role check | VERIFIED | `src/modules/grants/service.ts`, `routes.ts` | `test/grants.test.ts` | |
+| REQ-GRANT-004 | Expired/revoked → GRANT_EXPIRED | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | A.6#15 |
+| REQ-GRANT-005 | Same-user idempotent / other-user 409 | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
+| REQ-GRANT-006 | Redeem sets accessUntil, audits | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
+| REQ-GRANT-007 | Redeem returns full offline bundle | IMPLEMENTED (partial) | `src/modules/grants/service.ts` | `test/grants.test.ts` | ships `{grant, patient}` only - `summary`/`timeline`/`pregnancy`/`ancContacts` need Visit/Pregnancy/AncContact (Phase 5/7), same reasoning as REQ-PATIENT-004..009 |
+| REQ-GRANT-008 | POST /grants/:id/revoke | VERIFIED | `src/modules/grants/routes.ts`, `service.ts` | `test/grants.test.ts` | |
+| REQ-GRANT-009 | 24h access window enforced on every call | VERIFIED | `src/plugins/auth.ts` (`canReadPatient`/`canAppendPatient`, built Session 4) | `test/grants.test.ts` | A.6#16 |
 | REQ-GRANT-012 | Printed long-lived QR + PIN redeem | NOT_STARTED | `src/modules/grants/service.ts` | `test/grants.test.ts` | Tier 2 — build only if time allows |
-| REQ-TEST-003 | grants.test.ts full lifecycle suite | NOT_STARTED | `test/grants.test.ts` | (is the test) | |
+| REQ-TEST-003 | grants.test.ts full lifecycle suite | VERIFIED | `test/grants.test.ts` | (is the test) | |
 | REQ-GRANT-010 | QR-share sheet UI | OUT-OF-REPO (frontend) | — | — | frontend.md S08 |
 | REQ-GRANT-011 | QR scanner UI | OUT-OF-REPO (frontend) | — | — | frontend.md S20 |
 

@@ -1,4 +1,4 @@
-import type { AuditEntry, Patient, Prisma } from '../../generated/prisma/client.js';
+import type { AccessGrant, AuditEntry, Patient, Prisma } from '../../generated/prisma/client.js';
 import { toDateOnly } from './dates.js';
 
 // The only place a User row becomes API JSON (REQ-API-007, REQ-USER-002).
@@ -91,5 +91,36 @@ export function toAuditDto(entry: AuditEntry): AuditDto {
     action: entry.action,
     grantId: entry.grantId,
     at: entry.at.toISOString(),
+  };
+}
+
+// REQ-GRANT-001..009. "never includes token" (backend.md §8) - the raw signed
+// JWT is returned separately, only once, on POST /grants's own response
+// (`token`/`qrPayload` fields); it is never re-derivable from this DTO.
+export interface GrantDto {
+  id: string;
+  patientId: string;
+  scope: string;
+  tokenJti: string;
+  expiresAt: string;
+  redeemedByUserId: string | null;
+  redeemedAt: string | null;
+  accessUntil: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export function toGrantDto(grant: AccessGrant): GrantDto {
+  return {
+    id: grant.id,
+    patientId: grant.patientId,
+    scope: grant.scope,
+    tokenJti: grant.tokenJti,
+    expiresAt: grant.expiresAt.toISOString(),
+    redeemedByUserId: grant.redeemedByUserId,
+    redeemedAt: grant.redeemedAt?.toISOString() ?? null,
+    accessUntil: grant.accessUntil?.toISOString() ?? null,
+    revokedAt: grant.revokedAt?.toISOString() ?? null,
+    createdAt: grant.createdAt.toISOString(),
   };
 }

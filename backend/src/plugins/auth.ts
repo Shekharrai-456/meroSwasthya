@@ -151,10 +151,12 @@ export async function canAppendPatient(
   return hasActiveGrant(actor.id, patientId, GrantScope.append);
 }
 
-// REQ-ROLE-006: fetch only what the audit row's denormalised actorName/
-// actorFacilityName fields need - never the full user row (avoids pulling
-// pinHash anywhere near a code path that isn't already careful about it).
-async function getActorAuditInfo(
+// REQ-ROLE-006/REQ-GRANT-*: fetch only what an audit row's denormalised
+// actorName/actorFacilityName fields need - never the full user row (avoids
+// pulling pinHash anywhere near a code path that isn't already careful about
+// it). Exported: modules/grants/service.ts needs the same lookup for
+// grant_created/grant_redeemed/grant_revoked audit rows.
+export async function getActorAuditInfo(
   userId: string,
 ): Promise<{ name: string; facilityName: string | null }> {
   const user = await prisma.user.findUniqueOrThrow({

@@ -1341,6 +1341,441 @@
           }
         }
       }
+    },
+    "/grants": {
+      "post": {
+        "summary": "Create an access grant (QR share)",
+        "tags": [
+          "grants"
+        ],
+        "description": "REQ-GRANT-001/002. Owner-only, rate-limited 20/hour/patient.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "patientId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "append"
+                    ]
+                  },
+                  "ttlMinutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "patientId",
+                  "scope"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "grant": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "scope": {
+                              "type": "string",
+                              "enum": [
+                                "read",
+                                "append"
+                              ]
+                            },
+                            "tokenJti": {
+                              "type": "string"
+                            },
+                            "expiresAt": {
+                              "type": "string"
+                            },
+                            "redeemedByUserId": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "redeemedAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "accessUntil": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "revokedAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "scope",
+                            "tokenJti",
+                            "expiresAt",
+                            "redeemedByUserId",
+                            "redeemedAt",
+                            "accessUntil",
+                            "revokedAt",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "token": {
+                          "type": "string"
+                        },
+                        "qrPayload": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "grant",
+                        "token",
+                        "qrPayload"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/grants/redeem": {
+      "post": {
+        "summary": "Redeem a scanned grant QR code",
+        "tags": [
+          "grants"
+        ],
+        "description": "REQ-GRANT-003..007. Role must be provider or fchv. Idempotent for the redeeming user; 409 ALREADY_REDEEMED for anyone else.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "qrPayload": {
+                    "type": "string",
+                    "pattern": "^SWC1:.+$"
+                  }
+                },
+                "required": [
+                  "qrPayload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "grant": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "scope": {
+                              "type": "string",
+                              "enum": [
+                                "read",
+                                "append"
+                              ]
+                            },
+                            "tokenJti": {
+                              "type": "string"
+                            },
+                            "expiresAt": {
+                              "type": "string"
+                            },
+                            "redeemedByUserId": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "redeemedAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "accessUntil": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "revokedAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "scope",
+                            "tokenJti",
+                            "expiresAt",
+                            "redeemedByUserId",
+                            "redeemedAt",
+                            "accessUntil",
+                            "revokedAt",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "patient": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "ownerUserId": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "sex": {
+                              "type": "string",
+                              "enum": [
+                                "female",
+                                "male",
+                                "other"
+                              ]
+                            },
+                            "dob": {
+                              "type": "string"
+                            },
+                            "bloodGroup": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "ward": {
+                              "nullable": true,
+                              "type": "number"
+                            },
+                            "municipality": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "allergies": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "chronicConditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "emergencyContactPhone": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ownerUserId",
+                            "name",
+                            "sex",
+                            "dob",
+                            "bloodGroup",
+                            "ward",
+                            "municipality",
+                            "allergies",
+                            "chronicConditions",
+                            "emergencyContactPhone",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "grant",
+                        "patient"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/grants/{id}/revoke": {
+      "post": {
+        "summary": "Revoke an access grant",
+        "tags": [
+          "grants"
+        ],
+        "description": "REQ-GRANT-008/009. Owner-only; provider access ends immediately.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "grant": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "scope": {
+                              "type": "string",
+                              "enum": [
+                                "read",
+                                "append"
+                              ]
+                            },
+                            "tokenJti": {
+                              "type": "string"
+                            },
+                            "expiresAt": {
+                              "type": "string"
+                            },
+                            "redeemedByUserId": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "redeemedAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "accessUntil": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "revokedAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "scope",
+                            "tokenJti",
+                            "expiresAt",
+                            "redeemedByUserId",
+                            "redeemedAt",
+                            "accessUntil",
+                            "revokedAt",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "grant"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "servers": [
