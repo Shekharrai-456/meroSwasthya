@@ -64,8 +64,11 @@ model User {
   facility   Facility? @relation(fields: [facilityId], references: [id], onDelete: Restrict)
   createdAt  DateTime  @default(now()) @map("created_at")
 
-  refreshTokens   RefreshToken[]
-  inviteCodesUsed InviteCode[]
+  refreshTokens        RefreshToken[]
+  inviteCodesUsed      InviteCode[]
+  patientsOwned        Patient[]
+  accessGrantsRedeemed AccessGrant[]
+  auditEntriesActed    AuditEntry[]
 
   @@map("users")
 }
@@ -105,4 +108,98 @@ model InviteCode {
   usedByUser   User?    @relation(fields: [usedByUserId], references: [id], onDelete: Restrict)
 
   @@map("invite_codes")
+}
+
+// Session 4 (Phase 3 — Patients).
+enum Sex {
+  female
+  male
+  other
+}
+
+// REQ-PATIENT-011.
+model Patient {
+  id                    String   @id
+  ownerUserId           String   @map("owner_user_id")
+  owner                 User     @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+  name                  String
+  sex                   Sex
+  dob                   DateTime @db.Date
+  bloodGroup            String?  @map("blood_group")
+  ward                  Int?
+  municipality          String?
+  allergies             Json     @default("[]")
+  chronicConditions     Json     @default("[]") @map("chronic_conditions")
+  emergencyContactPhone String?  @map("emergency_contact_phone")
+  version               Int      @default(1)
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  deleted               Boolean  @default(false)
+
+  accessGrants AccessGrant[]
+  auditEntries AuditEntry[]
+
+  @@index([ownerUserId])
+  @@index([updatedAt])
+  @@map("patients")
+}
+
+// Pulled forward from its documented Phase 4 slot, same rationale as Session
+// 3's Facility pull-forward: REQ-ROLE-003/004 (canReadPatient/canAppendPatient)
+// are Patient-module requirements that cannot be real without this table.
+// Only the schema is added - no /grants routes, QR token signing, or redeem
+// flow (those stay Phase 4/NOT_STARTED). See docs/PROGRESS.md Session 4 entry.
+enum GrantScope {
+  read
+  append
+}
+
+model AccessGrant {
+  id               String     @id @default(uuid())
+  patientId        String     @map("patient_id")
+  patient          Patient    @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  scope            GrantScope
+  tokenJti         String     @unique @map("token_jti")
+  expiresAt        DateTime   @map("expires_at")
+  redeemedByUserId String?    @map("redeemed_by_user_id")
+  redeemedByUser   User?      @relation(fields: [redeemedByUserId], references: [id], onDelete: Restrict)
+  redeemedAt       DateTime?  @map("redeemed_at")
+  accessUntil      DateTime?  @map("access_until")
+  revokedAt        DateTime?  @map("revoked_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+
+  @@index([patientId, redeemedByUserId, accessUntil])
+  @@map("access_grants")
+}
+
+// Pulled forward from its documented Phase 1 slot, same rationale as
+// AccessGrant above - REQ-PATIENT-010 (GET audit) and REQ-ROLE-006
+// (record_viewed throttle) need it directly. No routes.ts: audit is written
+// by other modules' service code and read only via patients/routes.ts, per
+// docs/ARCHITECTURE.md's directory tree. No `deleted` field - REQ-AUDIT-002
+// requires audit rows to be immutable and undeletable, not merely
+// soft-deletable.
+enum AuditAction {
+  grant_created
+  grant_redeemed
+  record_viewed
+  visit_added
+  contact_recorded
+  document_added
+  grant_revoked
+}
+
+model AuditEntry {
+  id                String      @id @default(uuid())
+  patientId         String      @map("patient_id")
+  patient           Patient     @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  actorUserId       String      @map("actor_user_id")
+  actorUser         User        @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorName         String      @map("actor_name")
+  actorFacilityName String?     @map("actor_facility_name")
+  action            AuditAction
+  grantId           String?     @map("grant_id")
+  at                DateTime    @default(now())
+
+  @@index([patientId, at])
+  @@map("audit_entries")
 }

@@ -629,6 +629,718 @@
           }
         }
       }
+    },
+    "/patients": {
+      "post": {
+        "summary": "Create a family profile",
+        "tags": [
+          "patients"
+        ],
+        "description": "REQ-PATIENT-001/002. Client-generated id; posting the same id twice is idempotent for its owner, FORBIDDEN for anyone else.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "female",
+                      "male",
+                      "other"
+                    ]
+                  },
+                  "dob": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "bloodGroup": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "ward": {
+                    "nullable": true,
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "municipality": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "allergies": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "chronicConditions": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "emergencyContactPhone": {
+                    "nullable": true,
+                    "type": "string",
+                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "sex",
+                  "dob",
+                  "allergies",
+                  "chronicConditions"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "ownerUserId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "sex": {
+                          "type": "string",
+                          "enum": [
+                            "female",
+                            "male",
+                            "other"
+                          ]
+                        },
+                        "dob": {
+                          "type": "string"
+                        },
+                        "bloodGroup": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "ward": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "municipality": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "allergies": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "chronicConditions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "emergencyContactPhone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "deleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "ownerUserId",
+                        "name",
+                        "sex",
+                        "dob",
+                        "bloodGroup",
+                        "ward",
+                        "municipality",
+                        "allergies",
+                        "chronicConditions",
+                        "emergencyContactPhone",
+                        "version",
+                        "updatedAt",
+                        "deleted"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List patients visible to the caller",
+        "tags": [
+          "patients"
+        ],
+        "description": "REQ-ROLE-007. patient role: owned only. provider/fchv: owned union active-grant patients. No pagination (small, bounded lists).",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "ownerUserId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "sex": {
+                                "type": "string",
+                                "enum": [
+                                  "female",
+                                  "male",
+                                  "other"
+                                ]
+                              },
+                              "dob": {
+                                "type": "string"
+                              },
+                              "bloodGroup": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "ward": {
+                                "nullable": true,
+                                "type": "number"
+                              },
+                              "municipality": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "allergies": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "chronicConditions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "emergencyContactPhone": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "number"
+                              },
+                              "updatedAt": {
+                                "type": "string"
+                              },
+                              "deleted": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "ownerUserId",
+                              "name",
+                              "sex",
+                              "dob",
+                              "bloodGroup",
+                              "ward",
+                              "municipality",
+                              "allergies",
+                              "chronicConditions",
+                              "emergencyContactPhone",
+                              "version",
+                              "updatedAt",
+                              "deleted"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}": {
+      "get": {
+        "summary": "Get a single patient",
+        "tags": [
+          "patients"
+        ],
+        "description": "REQ-PATIENT-004. canRead-gated (REQ-ROLE-003). Patient entity only - no summary block yet, see docs/PROGRESS.md Session 4 entry.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "ownerUserId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "sex": {
+                          "type": "string",
+                          "enum": [
+                            "female",
+                            "male",
+                            "other"
+                          ]
+                        },
+                        "dob": {
+                          "type": "string"
+                        },
+                        "bloodGroup": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "ward": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "municipality": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "allergies": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "chronicConditions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "emergencyContactPhone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "deleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "ownerUserId",
+                        "name",
+                        "sex",
+                        "dob",
+                        "bloodGroup",
+                        "ward",
+                        "municipality",
+                        "allergies",
+                        "chronicConditions",
+                        "emergencyContactPhone",
+                        "version",
+                        "updatedAt",
+                        "deleted"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update a patient (owner only)",
+        "tags": [
+          "patients"
+        ],
+        "description": "REQ-PATIENT-003. Optimistic concurrency via `version`; mismatch -> 409 VERSION_CONFLICT.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "sex": {
+                    "type": "string",
+                    "enum": [
+                      "female",
+                      "male",
+                      "other"
+                    ]
+                  },
+                  "dob": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "bloodGroup": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "ward": {
+                    "nullable": true,
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "municipality": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "allergies": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "chronicConditions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "emergencyContactPhone": {
+                    "nullable": true,
+                    "type": "string",
+                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                  }
+                },
+                "required": [
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "ownerUserId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "sex": {
+                          "type": "string",
+                          "enum": [
+                            "female",
+                            "male",
+                            "other"
+                          ]
+                        },
+                        "dob": {
+                          "type": "string"
+                        },
+                        "bloodGroup": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "ward": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "municipality": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "allergies": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "chronicConditions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "emergencyContactPhone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "deleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "ownerUserId",
+                        "name",
+                        "sex",
+                        "dob",
+                        "bloodGroup",
+                        "ward",
+                        "municipality",
+                        "allergies",
+                        "chronicConditions",
+                        "emergencyContactPhone",
+                        "version",
+                        "updatedAt",
+                        "deleted"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}/audit": {
+      "get": {
+        "summary": "Who viewed this patient's record",
+        "tags": [
+          "patients"
+        ],
+        "description": "REQ-PATIENT-010, REQ-AUDIT-003. Owner-only, newest-first.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "patientId": {
+                                "type": "string"
+                              },
+                              "actorUserId": {
+                                "type": "string"
+                              },
+                              "actorName": {
+                                "type": "string"
+                              },
+                              "actorFacilityName": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "grant_created",
+                                  "grant_redeemed",
+                                  "record_viewed",
+                                  "visit_added",
+                                  "contact_recorded",
+                                  "document_added",
+                                  "grant_revoked"
+                                ]
+                              },
+                              "grantId": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "at": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "patientId",
+                              "actorUserId",
+                              "actorName",
+                              "actorFacilityName",
+                              "action",
+                              "grantId",
+                              "at"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "servers": [

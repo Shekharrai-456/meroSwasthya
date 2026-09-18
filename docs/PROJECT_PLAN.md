@@ -33,8 +33,8 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-CODELIST-002 | CodeListItem fields | NOT_STARTED | `prisma/schema.prisma` | `test/codelists.test.ts` | |
 | REQ-META-001 | GET /rules serves RULES verbatim | NOT_STARTED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | depends on `rules.json` existing (Phase 6) |
 | REQ-META-002 | GET /config feature flags | NOT_STARTED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | |
-| REQ-AUDIT-001 | AuditEntry written on 7 actions | NOT_STARTED | `src/modules/audit/service.ts` | tested per triggering module | scaffolding here; each `logAudit()` call site tested where it's triggered |
-| REQ-AUDIT-002 | Audit rows immutable | NOT_STARTED | `prisma/schema.prisma` (no `deleted` field on AuditEntry) | `test/foundation.test.ts` | |
+| REQ-AUDIT-001 | AuditEntry written on 7 actions | IMPLEMENTED (partial) | `src/modules/audit/service.ts` (`logAudit`), called from `src/plugins/auth.ts` | `test/patients.test.ts` | only `record_viewed` is wired up (Session 4); the other 6 actions (`grant_created`, `grant_redeemed`, `visit_added`, `contact_recorded`, `document_added`, `grant_revoked`) get their `logAudit()` call sites when their own modules (Phase 4/5/7/9) are built |
+| REQ-AUDIT-002 | Audit rows immutable | IMPLEMENTED | `prisma/schema.prisma` (no `deleted` field, no update/delete code path on AuditEntry anywhere) | — | structurally enforced (nothing in the codebase can modify a row); no dedicated test since there's no code path to test against |
 | REQ-AUDIT-003 | GET /patients/:id/audit, owner-only | NOT_STARTED | `src/modules/patients/routes.ts` | `test/patients.test.ts` | endpoint lives in Patients module; row here since it's fundamentally an audit-read concern |
 | REQ-SEED-001 | Seed facilities/invites/users/patients/visits/pregnancy/sms | NOT_STARTED | `prisma/seed.ts` | manual: `npm run seed` then inspect | |
 | REQ-SEED-002 | demo:reset recomputes Sita's LMP | NOT_STARTED | `prisma/seed.ts`, `package.json` script | manual | |
@@ -59,11 +59,11 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-AUTH-013 | Invite codes seeded | IMPLEMENTED (schema only) | `prisma/schema.prisma` | `test/auth.test.ts` (ad-hoc fixtures, passing) | real seeding (`prisma/seed.ts`) is Phase 1, still NOT_STARTED |
 | REQ-ROLE-001 | Role enum | IMPLEMENTED | `prisma/schema.prisma` | — | exercised indirectly by every auth test; no dedicated test file |
 | REQ-ROLE-002 | requireRole() → 403 | TESTED | `src/plugins/auth.ts` | `test/authz-matrix.test.ts` | |
-| REQ-ROLE-003 | canReadPatient() | NOT_STARTED | `src/modules/patients/service.ts` (was planned as `src/plugins/auth.ts`) | `test/authz-matrix.test.ts` | moved: queries the `Patient`/`AccessGrant` tables, which don't exist until Phase 3/4 - see Session 3 PROGRESS entry |
-| REQ-ROLE-004 | canAppendPatient() | NOT_STARTED | `src/modules/patients/service.ts` (was planned as `src/plugins/auth.ts`) | `test/authz-matrix.test.ts` | same Phase 3/4 dependency as REQ-ROLE-003 |
+| REQ-ROLE-003 | canReadPatient() | VERIFIED | `src/plugins/auth.ts` (built where originally planned - not moved after all, see Session 4 PROGRESS entry) | `test/patients.test.ts` | owner OR active unrevoked unexpired redeemed grant |
+| REQ-ROLE-004 | canAppendPatient() | VERIFIED | `src/plugins/auth.ts` | `test/patients.test.ts` | canReadPatient AND scope=append; owner always passes regardless of scope |
 | REQ-ROLE-005 | fchv blocked from visits (route + sync) | NOT_STARTED | `src/plugins/auth.ts`, enforced in `visits/routes.ts` and `sync/service.ts` | `test/authz-matrix.test.ts` | Question 1; depends on Phase 5 (visits)/6 (sync) existing |
-| REQ-ROLE-006 | record_viewed throttled 10min | NOT_STARTED | `src/modules/patients/service.ts` | `test/authz-matrix.test.ts` | depends on REQ-ROLE-003 and `AuditEntry` (Phase 1) existing |
-| REQ-ROLE-007 | GET /patients role scoping | NOT_STARTED | `src/modules/patients/routes.ts` | `test/patients.test.ts` | endpoint itself built in Phase 3; authorization primitive here |
+| REQ-ROLE-006 | record_viewed throttled 10min | VERIFIED | `src/plugins/auth.ts` (`assertCanReadPatient`), `src/modules/audit/service.ts` | `test/patients.test.ts` | fires only for provider/fchv actors, throttled via a query on AuditEntry's own recent rows, not a separate counter |
+| REQ-ROLE-007 | GET /patients role scoping | VERIFIED | `src/modules/patients/routes.ts`, `service.ts` | `test/patients.test.ts` | patient role: owned only. provider/fchv/admin: owned union active-grant patients |
 | REQ-ROLE-008 | Grant/access token type separation | TESTED | `src/lib/tokens.ts` | `test/auth.test.ts`, `test/authz-matrix.test.ts` | grant-token half (`GRANT_SECRET`) still Phase 4; access/temp separation fully built and tested now |
 | REQ-USER-001 | User entity fields | IMPLEMENTED | `prisma/schema.prisma` | — | exercised indirectly by every auth test; no dedicated test file |
 | REQ-USER-002 | User serializer never leaks pinHash | TESTED | `src/lib/serializers.ts` | `test/auth.test.ts` | whitelist-only DTO, never spreads the Prisma row |
@@ -77,23 +77,25 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-PATIENT-001 | POST /patients, idempotent create | NOT_STARTED | `src/modules/patients/routes.ts`, `service.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-002 | Same id, different owner → 403 | NOT_STARTED | `src/modules/patients/service.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-003 | PATCH, optimistic concurrency | NOT_STARTED | `src/modules/patients/service.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-004 | GET /patients/:id + summary | NOT_STARTED | `src/modules/patients/routes.ts`, `summary.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-005 | Summary.activeProblems | NOT_STARTED | `src/modules/patients/summary.ts` | `test/patients.test.ts` | needs Phase 5 (visits) data to test meaningfully |
-| REQ-PATIENT-006 | Summary.currentMedicines | NOT_STARTED | `src/modules/patients/summary.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-007 | Summary allergies/lastVitals/pregnancy/counts | NOT_STARTED | `src/modules/patients/summary.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-008 | GET timeline, unified feed | NOT_STARTED | `src/modules/patients/timeline.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-009 | Timeline item formatting per kind | NOT_STARTED | `src/modules/patients/timeline.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-010 | GET audit, owner-only | NOT_STARTED | `src/modules/patients/routes.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-011 | Patient fields | NOT_STARTED | `prisma/schema.prisma` | — | |
-| REQ-PATIENT-012 | Soft-delete flag + read filters | NOT_STARTED | every `patients/*` query | `test/patients.test.ts` | Question 4: no write path built |
+| REQ-PATIENT-001 | POST /patients, idempotent create | VERIFIED | `src/modules/patients/routes.ts`, `service.ts` | `test/patients.test.ts` | |
+| REQ-PATIENT-002 | Same id, different owner → 403 | VERIFIED | `src/modules/patients/service.ts` | `test/patients.test.ts` | |
+| REQ-PATIENT-003 | PATCH, optimistic concurrency | VERIFIED | `src/modules/patients/service.ts` | `test/patients.test.ts` | |
+| REQ-PATIENT-004 | GET /patients/:id + summary | IMPLEMENTED (partial) | `src/modules/patients/routes.ts`, `service.ts` | `test/patients.test.ts` | patient entity only, no `summary` block - see REQ-PATIENT-005/006/007 |
+| REQ-PATIENT-005 | Summary.activeProblems | NOT_STARTED | — | — | needs the Visit table (Phase 5) + CodeListItem (Phase 1); deliberately not stubbed, see Session 4 PROGRESS entry |
+| REQ-PATIENT-006 | Summary.currentMedicines | NOT_STARTED | — | — | needs the Visit table (Phase 5); same reasoning as REQ-PATIENT-005 |
+| REQ-PATIENT-007 | Summary allergies/lastVitals/pregnancy/counts | NOT_STARTED | — | — | needs Visit (Phase 5) + Pregnancy (Phase 7); `allergies` alone is trivially `= patient.allergies` but the REQ ships as one unit with the rest |
+| REQ-PATIENT-008 | GET timeline, unified feed | NOT_STARTED | — | — | unions Visit/Document/Pregnancy/AncContact/Delivery - none exist until Phase 5/7/9 |
+| REQ-PATIENT-009 | Timeline item formatting per kind | NOT_STARTED | — | — | depends on REQ-PATIENT-008 |
+| REQ-PATIENT-010 | GET audit, owner-only | VERIFIED | `src/modules/patients/routes.ts`, `service.ts`, `src/modules/audit/service.ts` | `test/patients.test.ts` | |
+| REQ-PATIENT-011 | Patient fields | VERIFIED | `prisma/schema.prisma` | `test/patients.test.ts` (exercised via every endpoint) | |
+| REQ-PATIENT-012 | Soft-delete flag + read filters | VERIFIED | every `patients/*` query (`deleted: false`) | `test/patients.test.ts` | Question 4: no write path built, filter is tested by construction (nothing sets it true) |
 | REQ-PATIENT-013 | Family list UI | OUT-OF-REPO (frontend) | — | — | frontend.md S06 |
 | REQ-PATIENT-014 | Add/edit patient form UI | OUT-OF-REPO (frontend) | — | — | frontend.md S07 |
 | REQ-PATIENT-015 | Provider cached-bundle expiry UI | OUT-OF-REPO (frontend) | — | — | frontend.md S19 |
 
 ## Phase 4 — Access Grants (QR)
+
+**Schema pulled forward into Session 4 (Patients):** the `AccessGrant` table (`prisma/schema.prisma`) already exists - it's a hard dependency of `canReadPatient`/`canAppendPatient` (REQ-ROLE-003/004). Only the table; no `/grants` routes, QR token signing, or redeem flow exist yet, so every row below stays NOT_STARTED.
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|

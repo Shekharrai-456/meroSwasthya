@@ -1,16 +1,21 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { Role } from '../../generated/prisma/enums.js';
+import { AuditAction, GrantScope, Role } from '../../generated/prisma/enums.js';
 import { AppError, ErrorCode } from '../lib/errors.js';
+import { prisma } from '../lib/prisma.js';
 import { verifyAccessToken, verifyTempToken } from '../lib/tokens.js';
+import { logAudit, wasRecentlyViewed } from '../modules/audit/service.js';
 
 // docs/ARCHITECTURE.md §1/§3, REQ-ROLE-002/008. Two genuinely different
 // mechanisms, kept separate on purpose:
 //   - requireAuth/requireRole: WHO the caller is (role-based access control).
 //   - canReadPatient/canAppendPatient (object-level ownership): WHICH record
-//     they may touch. Those live in Phase 3/4 (src/modules/patients,
-//     src/modules/grants) because they query the Patient/AccessGrant tables,
-//     which don't exist yet - see docs/PROGRESS.md's Session 3 entry for why
-//     REQ-ROLE-003/004/005/006/007 are deliberately not built here.
+//     they may touch.
+//
+// canReadPatient/canAppendPatient (REQ-ROLE-003/004) were deferred from
+// Session 3 because they need the Patient/AccessGrant tables - both now
+// exist (Session 4, Phase 3). REQ-ROLE-005 (fchv blocked from visits) still
+// can't be built here: it depends on the Visits module (Phase 5), which
+// doesn't exist yet.
 
 export interface AuthenticatedUser {
   id: string;
@@ -91,4 +96,106 @@ export function requireRole(...roles: Role[]) {
       throw new AppError(ErrorCode.FORBIDDEN, 'Role not allowed for this endpoint');
     }
   };
+}
+
+// REQ-ROLE-003. Patient rows are never hard-checked for existence here - a
+// nonexistent/soft-deleted patient simply has no owner match and no grant
+// match, so this returns false exactly as if access were denied. Callers
+// that need to distinguish "doesn't exist" (404) from "exists, no access"
+// (403) - every route in modules/patients/routes.ts - check existence first.
+async function isOwner(actorUserId: string, patientId: string): Promise<boolean> {
+  const patient = await prisma.patient.findFirst({
+    where: { id: patientId, deleted: false, ownerUserId: actorUserId },
+    select: { id: true },
+  });
+  return patient !== null;
+}
+
+async function hasActiveGrant(
+  actorUserId: string,
+  patientId: string,
+  requiredScope?: GrantScope,
+): Promise<boolean> {
+  const grant = await prisma.accessGrant.findFirst({
+    where: {
+      patientId,
+      redeemedByUserId: actorUserId,
+      revokedAt: null,
+      accessUntil: { gt: new Date() },
+      ...(requiredScope ? { scope: requiredScope } : {}),
+    },
+    select: { id: true },
+  });
+  return grant !== null;
+}
+
+export async function canReadPatient(
+  actor: AuthenticatedUser,
+  patientId: string,
+): Promise<boolean> {
+  if (await isOwner(actor.id, patientId)) {
+    return true;
+  }
+  return hasActiveGrant(actor.id, patientId);
+}
+
+// REQ-ROLE-004: canReadPatient AND scope=append - owners always pass
+// regardless of scope, since scope only constrains a *grant*, not ownership.
+export async function canAppendPatient(
+  actor: AuthenticatedUser,
+  patientId: string,
+): Promise<boolean> {
+  if (await isOwner(actor.id, patientId)) {
+    return true;
+  }
+  return hasActiveGrant(actor.id, patientId, GrantScope.append);
+}
+
+// REQ-ROLE-006: fetch only what the audit row's denormalised actorName/
+// actorFacilityName fields need - never the full user row (avoids pulling
+// pinHash anywhere near a code path that isn't already careful about it).
+async function getActorAuditInfo(
+  userId: string,
+): Promise<{ name: string; facilityName: string | null }> {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { name: true, facility: { select: { name: true } } },
+  });
+  return { name: user.name, facilityName: user.facility?.name ?? null };
+}
+
+// REQ-ROLE-003/006 combined: the one place a route asks "can this caller
+// read this patient", throwing FORBIDDEN if not, and - only for provider/
+// fchv actors, per REQ-ROLE-006's literal wording - writing a throttled
+// record_viewed audit row as a side effect of a successful check. Patients
+// reading their own record never trigger it (nothing suspicious about that).
+export async function assertCanReadPatient(
+  actor: AuthenticatedUser,
+  patientId: string,
+): Promise<void> {
+  const allowed = await canReadPatient(actor, patientId);
+  if (!allowed) {
+    throw new AppError(ErrorCode.FORBIDDEN, 'No access to this patient');
+  }
+  if (actor.role === Role.provider || actor.role === Role.fchv) {
+    const alreadyLogged = await wasRecentlyViewed(actor.id, patientId);
+    if (!alreadyLogged) {
+      const { name, facilityName } = await getActorAuditInfo(actor.id);
+      await logAudit({
+        patientId,
+        actor: { ...actor, name, facilityName },
+        action: AuditAction.record_viewed,
+      });
+    }
+  }
+}
+
+export async function assertCanAppendPatient(
+  actor: AuthenticatedUser,
+  patientId: string,
+): Promise<void> {
+  const allowed = await canAppendPatient(actor, patientId);
+  if (!allowed) {
+    throw new AppError(ErrorCode.FORBIDDEN, 'No append access to this patient');
+  }
 }
