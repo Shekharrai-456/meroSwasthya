@@ -1,0 +1,18 @@
+// Foundation only (Session 2): generator + datasource, no models yet.
+// Models are added per-module, one migration per module, starting in Session 3
+// (User/RefreshToken/OtpCode/InviteCode) per docs/PROJECT_PLAN.md's phase order.
+// Full target schema is specified in docs/DATA_MODEL.md.
+//
+// Prisma 7 note (discovered during Session 2, not in docs/TECH_DECISIONS.md's
+// original research): the `prisma-client-js` generator is deprecated and
+// `datasource.url` is no longer read from this file at all - both moved to
+// prisma.config.ts + a driver adapter. See that file and src/lib/prisma.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}

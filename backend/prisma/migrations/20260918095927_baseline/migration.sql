@@ -1,0 +1,5 @@
+-- Baseline migration (Session 2 — Foundation).
+-- No tables yet: schema.prisma has zero models at this phase. This file
+-- exists only so the Prisma migration history (and `prisma migrate dev`'s
+-- shadow-database diffing) has a real starting point before Session 3 adds
+-- the first models (User, RefreshToken, OtpCode, InviteCode).

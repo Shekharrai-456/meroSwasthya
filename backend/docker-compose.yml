@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: swc
+      POSTGRES_PASSWORD: swc
+      POSTGRES_DB: swc
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Separate database for the test suite (docs/ARCHITECTURE.md, Session 2 step 4) -
+  # same server, different logical DB, so tests never touch dev data.
+  postgres-test-init:
+    image: postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: swc
+    entrypoint: >
+      bash -c "psql -h postgres -U swc -d swc -tc \"SELECT 1 FROM pg_database WHERE datname = 'swc_test'\" | grep -q 1 || psql -h postgres -U swc -d swc -c \"CREATE DATABASE swc_test\""
+    restart: "no"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio:/data
+
+volumes:
+  pg: {}
+  minio: {}
+
+# After `docker compose up`: create the swc-docs bucket (mc client or the web console
+# at :9001). Presigned URLs must use the PUBLIC host when phones can't reach
+# localhost:9000 - set S3_PUBLIC_ENDPOINT accordingly (docs/TECH_DECISIONS.md).

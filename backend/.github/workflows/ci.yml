@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: swc
+          POSTGRES_PASSWORD: swc
+          POSTGRES_DB: swc_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U swc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://swc:swc@localhost:5432/swc_test
+      TEST_DATABASE_URL: postgresql://swc:swc@localhost:5432/swc_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-secret-32-characters-minimum-000
+      GRANT_SECRET: ci-only-secret-different-32-chars-000000
+      S3_ENDPOINT: http://localhost:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_BUCKET: swc-docs
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: minio123
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        working-directory: backend
+        run: npm ci
+
+      - name: Prisma generate + migrate
+        working-directory: backend
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      - name: make check (format, lint, typecheck, test)
+        working-directory: backend
+        run: npm run check
