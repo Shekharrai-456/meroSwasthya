@@ -9,11 +9,13 @@ requirement-by-requirement status of what's actually built and verified.
 ## Current status
 
 Foundation, Auth (login/PIN/tokens/RBAC), Patients (family profiles), Access
-Grants (QR sharing), and Visits (clinical encounters, with a partial code
-list seed) are built and verified. Everything else in `docs/PROJECT_PLAN.md`
-(Sync, Maternal/ANC, Reminders, Documents, Facilities/code lists routes, the
-rest of seed data) is not yet started — see `docs/FINAL_AUDIT.md` and
-`docs/PROGRESS.md`'s Session 7 entry for the exact per-requirement breakdown.
+Grants (QR sharing), Visits (clinical encounters, with a partial code list
+seed), and Maternal (pregnancy registration, the 8-contact ANC schedule,
+server-side triage, delivery) are built and verified. Everything else in
+`docs/PROJECT_PLAN.md` (Sync, Reminders, Documents, Facilities/code lists
+routes, the rest of seed data) is not yet started — see `docs/FINAL_AUDIT.md`
+and `docs/PROGRESS.md`'s Session 9 entry for the exact per-requirement
+breakdown.
 
 ## Prerequisites
 

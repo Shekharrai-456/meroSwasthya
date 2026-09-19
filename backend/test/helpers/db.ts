@@ -11,7 +11,7 @@ import { redis } from '../../src/lib/redis.js';
 // `fileParallelism: false` for why this means test FILES (not individual
 // tests within a file) run sequentially against the shared test database.
 export async function resetDb(): Promise<void> {
-  await prisma.$executeRaw`TRUNCATE TABLE "audit_entries", "access_grants", "reminders", "visits", "patients", "codelist_items", "invite_codes", "refresh_tokens", "otp_codes", "users", "facilities" RESTART IDENTITY CASCADE`;
+  await prisma.$executeRaw`TRUNCATE TABLE "audit_entries", "access_grants", "reminders", "deliveries", "anc_contacts", "pregnancies", "visits", "patients", "codelist_items", "invite_codes", "refresh_tokens", "otp_codes", "users", "facilities" RESTART IDENTITY CASCADE`;
 }
 
 // Rate-limit/lockout counters (lib/rateLimiter.ts) live in Redis, not

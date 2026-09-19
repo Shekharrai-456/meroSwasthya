@@ -162,27 +162,27 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-RULES-001 | RULES table, versioned | NOT_STARTED | `src/modules/maternal/rules/rules.json` | `test/rules.test.ts` | served by Phase 1's `GET /rules` once this exists |
-| REQ-RULES-002 | Triage priority-order logic | NOT_STARTED | `src/modules/maternal/rules/triage.ts` | `test/rules.test.ts` | |
-| REQ-RULES-003 | 16 shared A.6 test cases pass | NOT_STARTED | `test/rules.test.ts` | (is the test) | **must pass before wiring endpoints**, per `backend.md` §14 rule 6 — build this file first in this phase |
-| REQ-RULES-004 | Server triage wins on client disagreement | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | backend just always returns its own computed value; client-side reconciliation is OUT-OF-REPO |
+| REQ-RULES-001 | RULES table, versioned | VERIFIED | `src/modules/maternal/rules/rules.json` | `test/rules.test.ts` (indirect, via edd/schedule/triage) | served verbatim by `GET /rules` once Phase 1's Meta module exists - the route itself stays NOT_STARTED |
+| REQ-RULES-002 | Triage priority-order logic | VERIFIED | `src/modules/maternal/rules/triage.ts` | `test/rules.test.ts` | ported line-for-line from frontend.md §12's Dart source |
+| REQ-RULES-003 | 16 shared A.6 test cases pass | VERIFIED | `test/rules.test.ts`, `test/maternal.test.ts`, `test/grants.test.ts` | (is the test) | cases 1-11 (pure rules engine) in `test/rules.test.ts`, run and green before any Maternal endpoint was wired up per `backend.md` §14 rule 6; case 12 (male patient 422) is endpoint-level, in `test/maternal.test.ts`; cases 15/16 (grant expiry) already covered by `test/grants.test.ts` since Session 5; cases 13/14 (sync idempotency/conflict) need the Sync module, still NOT_STARTED |
+| REQ-RULES-004 | Server triage wins on client disagreement | VERIFIED | `src/modules/maternal/service.ts` (`recordContact`) | `test/maternal.test.ts` | server always computes and returns its own triage from `findings`/`dangerSigns` alone - the client never sends a triage value for the server to "disagree" with, so there's structurally nothing else for the server to defer to; client-side reconciliation is OUT-OF-REPO |
 | REQ-RULES-005 | Verify ANC protocol against DoHS source | NOT_STARTED | `src/modules/maternal/rules/rules.json` (content review) | manual research task | not inferable from docs alone — needs an external source lookup before the demo |
-| REQ-PREG-001 | Female-only rule | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | A.6#12 |
-| REQ-PREG-002 | No second active pregnancy | NOT_STARTED | `src/modules/maternal/service.ts`, DB partial unique index (`docs/DATA_MODEL.md`) | `test/maternal.test.ts` | |
-| REQ-PREG-003 | edd/riskLevel computation | NOT_STARTED | `src/modules/maternal/rules/edd.ts`, `service.ts` | `test/rules.test.ts`, `test/maternal.test.ts` | A.6#1/#2 |
-| REQ-PREG-004 | Transactional pregnancy + 8 contacts | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
-| REQ-PREG-005 | Contact dueAt from ancSchedule | NOT_STARTED | `src/modules/maternal/rules/schedule.ts` | `test/rules.test.ts` | |
-| REQ-PREG-006 | anc_due reminders created | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | writes `Reminder` rows; worker is Phase 8 |
-| REQ-PREG-007 | anc_missed reminder (single, no 7-day repeat) | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | Question 5: repeat explicitly out of Tier-1 scope |
-| REQ-PREG-008 | GET /pregnancies/:id | NOT_STARTED | `src/modules/maternal/routes.ts` | `test/maternal.test.ts` | |
-| REQ-PREG-009 | PATCH /pregnancies/:id | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
-| REQ-PREG-010 | PUT contacts/:contactNo | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
-| REQ-PREG-011 | Server-side triage computation | NOT_STARTED | `src/modules/maternal/service.ts`, `rules/triage.ts` | `test/maternal.test.ts` | |
-| REQ-PREG-012 | Save contact: version++, cancel reminder | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
-| REQ-PREG-013 | nearestReferral lookup | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | depends on Phase 1 facilities |
-| REQ-PREG-014 | Audit contact_recorded | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
-| REQ-PREG-015 | POST delivery, closes pregnancy | NOT_STARTED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
-| REQ-TEST-001 | rules.test.ts 16 cases (backend) | NOT_STARTED | `test/rules.test.ts` | (is the test) | |
+| REQ-PREG-001 | Female-only rule | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | A.6#12 |
+| REQ-PREG-002 | No second active pregnancy | VERIFIED | `src/modules/maternal/service.ts`, DB partial unique index (`docs/DATA_MODEL.md`) | `test/maternal.test.ts` | |
+| REQ-PREG-003 | edd/riskLevel computation | VERIFIED | `src/modules/maternal/rules/edd.ts`, `service.ts` | `test/rules.test.ts`, `test/maternal.test.ts` | A.6#1/#2 |
+| REQ-PREG-004 | Transactional pregnancy + 8 contacts | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
+| REQ-PREG-005 | Contact dueAt from ancSchedule | VERIFIED | `src/modules/maternal/rules/schedule.ts` | `test/rules.test.ts` | |
+| REQ-PREG-006 | anc_due reminders created | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | writes `Reminder` rows (to owner phone + `emergencyContactPhone` if set); worker/SMS delivery is Phase 8, still NOT_STARTED |
+| REQ-PREG-007 | anc_missed reminder (single, no 7-day repeat) | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | Question 5: repeat explicitly out of Tier-1 scope |
+| REQ-PREG-008 | GET /pregnancies/:id | VERIFIED | `src/modules/maternal/routes.ts` | `test/maternal.test.ts` | |
+| REQ-PREG-009 | PATCH /pregnancies/:id | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | Session 9 addition beyond backend.md's literal text: `status=ended` also cancels pending reminders (not just delivery) - see docs/PROGRESS.md's Session 9 entry |
+| REQ-PREG-010 | PUT contacts/:contactNo | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
+| REQ-PREG-011 | Server-side triage computation | VERIFIED | `src/modules/maternal/service.ts`, `rules/triage.ts` | `test/maternal.test.ts` | |
+| REQ-PREG-012 | Save contact: version++, cancel reminder | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
+| REQ-PREG-013 | nearestReferral lookup | VERIFIED | `src/modules/maternal/service.ts`, `src/lib/geo.ts` (Haversine) | `test/maternal.test.ts` | tested with real facility fixtures; null when the actor has no facility or none has a birthing centre |
+| REQ-PREG-014 | Audit contact_recorded | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | |
+| REQ-PREG-015 | POST delivery, closes pregnancy | VERIFIED | `src/modules/maternal/service.ts` | `test/maternal.test.ts` | idempotent on the client-generated delivery id, same convention as Visits |
+| REQ-TEST-001 | rules.test.ts 16 cases (backend) | VERIFIED | `test/rules.test.ts` | (is the test) | see REQ-RULES-003's note for how the 16 cases are actually distributed across files |
 | REQ-PREG-016 | Register-pregnancy button visibility | OUT-OF-REPO (frontend) | — | — | frontend.md S11 |
 | REQ-PREG-017 | Pregnancy dashboard UI | OUT-OF-REPO (frontend) | — | — | frontend.md S12 |
 | REQ-PREG-018 | ANC checklist UI + live client triage | OUT-OF-REPO (frontend) | — | — | frontend.md S13 |

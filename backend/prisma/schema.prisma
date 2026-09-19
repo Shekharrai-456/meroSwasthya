@@ -65,12 +65,14 @@ model User {
   facility   Facility? @relation(fields: [facilityId], references: [id], onDelete: Restrict)
   createdAt  DateTime  @default(now()) @map("created_at")
 
-  refreshTokens        RefreshToken[]
-  inviteCodesUsed      InviteCode[]
-  patientsOwned        Patient[]
-  accessGrantsRedeemed AccessGrant[]
-  auditEntriesActed    AuditEntry[]
-  visitsRecorded       Visit[]
+  refreshTokens         RefreshToken[]
+  inviteCodesUsed       InviteCode[]
+  patientsOwned         Patient[]
+  accessGrantsRedeemed  AccessGrant[]
+  auditEntriesActed     AuditEntry[]
+  visitsRecorded        Visit[]
+  pregnanciesRegistered Pregnancy[]
+  ancContactsRecorded   AncContact[]
 
   @@map("users")
 }
@@ -141,6 +143,7 @@ model Patient {
   auditEntries AuditEntry[]
   visits       Visit[]
   reminders    Reminder[]
+  pregnancies  Pregnancy[]
 
   @@index([ownerUserId])
   @@index([updatedAt])
@@ -257,18 +260,18 @@ enum ReminderStatus {
 
 // Pulled forward from its documented Phase 8 slot: REQ-VISIT-005 ("if
 // followUpAt is set, create a follow_up Reminder") is a hard dependency of
-// Visits. Only the columns Visits actually writes are added now.
-// `pregnancyId` is part of the full backend.md §6 shape but is used only by
-// Phase 7's anc_due/anc_missed reminders, which reference a Pregnancy table
-// that doesn't exist yet - deferred to that phase's migration, same
-// "schema only, only what's needed now" discipline as every earlier
-// pull-forward. The reminder worker (REQ-REMIND-001..003), SMS delivery, and
-// GET /patients/:id/reminders (REQ-REMIND-005) all stay NOT_STARTED - this
-// table is written to, never read from, by anything in this build so far.
+// Visits. `pregnancyId` was deferred in Session 7 (it would have referenced
+// a Pregnancy table that didn't exist yet) and is added now that Session 9's
+// Maternal module needs it for anc_due/anc_missed reminders. The reminder
+// worker (REQ-REMIND-001..003), SMS delivery, and GET /patients/:id/reminders
+// (REQ-REMIND-005) all stay NOT_STARTED - this table is written to, never
+// read from, by anything in this build so far.
 model Reminder {
   id             String         @id @default(uuid())
   patientId      String         @map("patient_id")
   patient        Patient        @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  pregnancyId    String?        @map("pregnancy_id")
+  pregnancy      Pregnancy?     @relation(fields: [pregnancyId], references: [id], onDelete: Restrict)
   refId          String?        @map("ref_id")
   kind           ReminderKind
   dueAt          DateTime       @map("due_at")
@@ -318,4 +321,113 @@ model Visit {
   @@index([patientId, visitAt])
   @@index([updatedAt])
   @@map("visits")
+}
+
+// Session 9 (Phase 7 - Maternal: Pregnancy, ANC, Triage). REQ-PREG-*, REQ-RULES-*.
+
+enum PregStatus {
+  active
+  delivered
+  ended
+}
+
+enum RiskLevel {
+  normal
+  high
+}
+
+model Pregnancy {
+  id                 String     @id
+  patientId          String     @map("patient_id")
+  patient            Patient    @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  lmp                DateTime?  @db.Date
+  edd                DateTime   @db.Date
+  gravida            Int
+  para               Int
+  riskFactors        Json       @default("[]") @map("risk_factors")
+  riskLevel          RiskLevel  @default(normal) @map("risk_level")
+  status             PregStatus @default(active)
+  birthPlan          Json?      @map("birth_plan")
+  registeredByUserId String     @map("registered_by_user_id")
+  registeredByUser   User       @relation(fields: [registeredByUserId], references: [id], onDelete: Restrict)
+  version            Int        @default(1)
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+  deleted            Boolean    @default(false)
+
+  contacts  AncContact[]
+  delivery  Delivery?
+  reminders Reminder[]
+
+  @@index([patientId, status])
+  @@index([updatedAt])
+  @@map("pregnancies")
+}
+
+enum Triage {
+  green
+  amber
+  red
+}
+
+// REQ-PREG-004/010, REQ-SYNC-023: id is deterministic (uuid v5), not
+// client/server-generated at random, so an offline-created pregnancy's 8
+// contacts never duplicate the server-generated set (src/lib/ids.ts).
+model AncContact {
+  id             String    @id
+  pregnancyId    String    @map("pregnancy_id")
+  pregnancy      Pregnancy @relation(fields: [pregnancyId], references: [id], onDelete: Restrict)
+  contactNo      Int       @map("contact_no")
+  weekTarget     Int       @map("week_target")
+  dueAt          DateTime  @db.Date @map("due_at")
+  doneAt         DateTime? @map("done_at")
+  providerUserId String?   @map("provider_user_id")
+  providerUser   User?     @relation(fields: [providerUserId], references: [id], onDelete: Restrict)
+  findings       Json?
+  dangerSigns    Json      @default("[]") @map("danger_signs")
+  triageLevel    Triage?   @map("triage_level")
+  triageReasons  Json      @default("[]") @map("triage_reasons")
+  referral       Json?
+  version        Int       @default(1)
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deleted        Boolean   @default(false)
+
+  @@unique([pregnancyId, contactNo])
+  @@index([updatedAt])
+  @@map("anc_contacts")
+}
+
+enum DeliveryPlace {
+  home
+  birthing_centre
+  hospital
+  on_the_way
+}
+
+enum DeliveryMode {
+  normal
+  assisted
+  cs
+}
+
+enum Outcome {
+  live_birth
+  stillbirth
+}
+
+model Delivery {
+  id            String        @id
+  pregnancyId   String        @unique @map("pregnancy_id")
+  pregnancy     Pregnancy     @relation(fields: [pregnancyId], references: [id], onDelete: Restrict)
+  deliveredAt   DateTime      @map("delivered_at")
+  place         DeliveryPlace
+  mode          DeliveryMode
+  outcome       Outcome
+  babyWeightKg  Float?        @map("baby_weight_kg")
+  babySex       Sex?          @map("baby_sex")
+  complications Json          @default("[]")
+  version       Int           @default(1)
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  deleted       Boolean       @default(false)
+
+  @@map("deliveries")
 }

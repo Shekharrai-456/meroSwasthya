@@ -1,0 +1,64 @@
+{
+  "version": "2026-09-18.1",
+  "ancSchedule": [
+    { "contactNo": 1, "weekTarget": 12, "checklist": ["weight", "bp", "hb", "urineProtein", "ifa", "td1", "riskAssessment"] },
+    { "contactNo": 2, "weekTarget": 20, "checklist": ["weight", "bp", "fundalHeight", "ifa", "calcium", "deworming", "td2"] },
+    { "contactNo": 3, "weekTarget": 26, "checklist": ["weight", "bp", "fundalHeight", "fhr", "ifa", "calcium"] },
+    { "contactNo": 4, "weekTarget": 30, "checklist": ["weight", "bp", "fundalHeight", "fhr", "hb", "urineProtein", "ifa", "calcium", "birthPlan"] },
+    { "contactNo": 5, "weekTarget": 34, "checklist": ["weight", "bp", "fundalHeight", "fhr", "ifa", "calcium", "birthPlan"] },
+    { "contactNo": 6, "weekTarget": 36, "checklist": ["weight", "bp", "fundalHeight", "fhr", "urineProtein", "ifa", "calcium", "presentation"] },
+    { "contactNo": 7, "weekTarget": 38, "checklist": ["weight", "bp", "fundalHeight", "fhr", "ifa", "calcium"] },
+    { "contactNo": 8, "weekTarget": 40, "checklist": ["weight", "bp", "fundalHeight", "fhr", "ifa", "calcium", "labourSigns"] }
+  ],
+  "dangerSigns": [
+    { "code": "VAGINAL_BLEEDING", "level": "red", "en": "Vaginal bleeding", "np": "योनिबाट रगत बग्नु" },
+    { "code": "CONVULSIONS", "level": "red", "en": "Convulsions / fits", "np": "काम्ने / मुर्छा पर्ने" },
+    { "code": "SEVERE_HEADACHE_BLURRED_VISION", "level": "red", "en": "Severe headache with blurred vision", "np": "कडा टाउको दुखाइ र आँखा धमिलो" },
+    { "code": "FEVER_WEAKNESS", "level": "red", "en": "High fever with weakness", "np": "उच्च ज्वरो र कमजोरी" },
+    { "code": "SEVERE_ABDOMINAL_PAIN", "level": "red", "en": "Severe abdominal pain", "np": "पेट कडा दुख्ने" },
+    { "code": "DIFFICULTY_BREATHING", "level": "red", "en": "Fast or difficult breathing", "np": "सास फेर्न गाह्रो" },
+    { "code": "WATER_BREAK_PRETERM", "level": "red", "en": "Water breaking before 37 weeks", "np": "३७ हप्ता अघि पानी फुट्नु" },
+    { "code": "REDUCED_FETAL_MOVEMENT", "level": "red", "en": "Reduced or absent fetal movement (after 20 wk)", "np": "बच्चा नचल्ने / कम चल्ने" },
+    { "code": "SWELLING_FACE_HANDS", "level": "amber", "en": "Swelling of face and hands", "np": "अनुहार र हात सुन्निनु" },
+    { "code": "PERSISTENT_VOMITING", "level": "amber", "en": "Persistent vomiting", "np": "लगातार बान्ता" }
+  ],
+  "riskFactors": [
+    { "code": "AGE_LT_18", "en": "Age under 18", "np": "१८ वर्ष मुनि" },
+    { "code": "AGE_GT_35", "en": "Age over 35", "np": "३५ वर्ष माथि" },
+    { "code": "PREV_CS", "en": "Previous caesarean section", "np": "पहिले शल्यक्रिया" },
+    { "code": "PREV_STILLBIRTH", "en": "Previous stillbirth / neonatal death", "np": "पहिले मृत जन्म" },
+    { "code": "GRAND_MULTIPARA", "en": "Para ≥ 5", "np": "५ वा बढी सन्तान" },
+    { "code": "MULTIPLE_PREGNANCY", "en": "Twins / multiple", "np": "जुम्ल्याहा" },
+    { "code": "HEIGHT_LT_145", "en": "Height under 145 cm", "np": "उचाइ १४५ से.मि. मुनि" },
+    { "code": "CHRONIC_ILLNESS", "en": "Chronic illness (diabetes, hypertension, heart, HIV)", "np": "दीर्घ रोग" }
+  ],
+  "triage": {
+    "description": "Evaluate in order; the first matching level wins. Level red > amber > green.",
+    "red": [
+      "any dangerSigns code with level \"red\"",
+      "findings.bpSys >= 160 OR findings.bpDia >= 110",
+      "findings.bpSys >= 140 OR findings.bpDia >= 90, AND (urineProtein in [\"+\",\"++\",\"+++\"] OR SEVERE_HEADACHE_BLURRED_VISION ticked)",
+      "findings.hbGdl < 7",
+      "findings.fetalMovement == \"absent\" AND gestationalAgeDays >= 140"
+    ],
+    "amber": [
+      "any dangerSigns code with level \"amber\"",
+      "findings.bpSys >= 140 OR findings.bpDia >= 90",
+      "findings.hbGdl >= 7 AND findings.hbGdl < 10",
+      "findings.urineProtein in [\"+\",\"++\",\"+++\"]",
+      "findings.fetalMovement == \"reduced\"",
+      "pregnancy.riskLevel == \"high\""
+    ],
+    "green": ["otherwise"],
+    "action": {
+      "red": "Refer NOW to nearest facility with birthing centre / hospital; show call button; set referral.urgency = \"urgent\".",
+      "amber": "Advise facility delivery; schedule follow-up within 7 days; show nearest birthing centre.",
+      "green": "Continue routine schedule."
+    }
+  },
+  "reminders": {
+    "anc_due": "Send 1 day before dueAt at 09:00 Asia/Kathmandu to patient phone and emergencyContactPhone (if set).",
+    "anc_missed": "Send 3 days after dueAt if doneAt is still null; repeat once after 7 days.",
+    "follow_up": "Send 1 day before Visit.followUpAt to patient phone."
+  }
+}

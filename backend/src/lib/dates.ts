@@ -13,6 +13,22 @@ export function toDateOnly(date: Date): string {
   return datePart;
 }
 
+// Pure date-only (YYYY-MM-DD) calendar-day arithmetic - never
+// timezone-aware, since these are AD calendar dates (dob/lmp/edd/dueAt),
+// not timestamps. Uses UTC internally purely to avoid local-timezone DST
+// edge cases; the result is still just a calendar date, not an instant.
+// Used by src/modules/maternal/rules/edd.ts (REQ-PREG-003/005/011) and
+// anywhere else that needs to shift a calendar date by N days.
+export function addDaysToDateOnly(dateOnlyStr: string, days: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnlyStr);
+  if (!match?.[1] || !match[2] || !match[3]) {
+    throw new Error(`Invalid date-only string: "${dateOnlyStr}"`);
+  }
+  const [, year, month, day] = match;
+  const result = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day) + days));
+  return toDateOnly(result);
+}
+
 export function now(): Date {
   return new Date();
 }

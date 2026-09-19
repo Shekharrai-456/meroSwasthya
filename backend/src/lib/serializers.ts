@@ -1,11 +1,17 @@
 import type {
   AccessGrant,
+  AncContact,
   AuditEntry,
+  Delivery,
+  Facility,
   Patient,
+  Pregnancy,
   Prisma,
+  Reminder,
   Visit,
 } from '../../generated/prisma/client.js';
 import { toDateOnly } from './dates.js';
+import { gestationalAgeDays } from '../modules/maternal/rules/edd.js';
 
 // The only place a User row becomes API JSON (REQ-API-007, REQ-USER-002).
 // Deliberately whitelist-only: this function never spreads the source row, so
@@ -190,5 +196,188 @@ export function toVisitDto(visit: Visit): VisitDto {
     version: visit.version,
     updatedAt: visit.updatedAt.toISOString(),
     deleted: visit.deleted,
+  };
+}
+
+// REQ-FACILITY-002. `distanceKm` is "only in /facilities/nearby responses"
+// per backend.md A.2 - every other caller (e.g. REQ-PREG-013's
+// nearestReferral) passes null, matching the "nullable field always
+// present as null" API convention rather than omitting the key.
+export interface FacilityDto {
+  id: string;
+  name: string;
+  type: string;
+  hasBirthingCentre: boolean;
+  phone: string | null;
+  lat: number;
+  lng: number;
+  municipality: string;
+  distanceKm: number | null;
+}
+
+export function toFacilityDto(facility: Facility, distanceKm: number | null = null): FacilityDto {
+  return {
+    id: facility.id,
+    name: facility.name,
+    type: facility.type,
+    hasBirthingCentre: facility.hasBirthingCentre,
+    phone: facility.phone,
+    lat: facility.lat,
+    lng: facility.lng,
+    municipality: facility.municipality,
+    distanceKm,
+  };
+}
+
+// REQ-PREG-*. Same whitelist-only discipline as every other DTO.
+export interface AncContactDto {
+  id: string;
+  pregnancyId: string;
+  contactNo: number;
+  weekTarget: number;
+  dueAt: string;
+  doneAt: string | null;
+  providerUserId: string | null;
+  findings: Record<string, unknown> | null;
+  dangerSigns: string[];
+  triageLevel: string | null;
+  triageReasons: string[];
+  referral: Record<string, unknown> | null;
+  version: number;
+  updatedAt: string;
+  deleted: boolean;
+}
+
+export function toAncContactDto(contact: AncContact): AncContactDto {
+  return {
+    id: contact.id,
+    pregnancyId: contact.pregnancyId,
+    contactNo: contact.contactNo,
+    weekTarget: contact.weekTarget,
+    dueAt: toDateOnly(contact.dueAt),
+    doneAt: contact.doneAt?.toISOString() ?? null,
+    providerUserId: contact.providerUserId,
+    findings: contact.findings as Record<string, unknown> | null,
+    dangerSigns: contact.dangerSigns as string[],
+    triageLevel: contact.triageLevel,
+    triageReasons: contact.triageReasons as string[],
+    referral: contact.referral as Record<string, unknown> | null,
+    version: contact.version,
+    updatedAt: contact.updatedAt.toISOString(),
+    deleted: contact.deleted,
+  };
+}
+
+export interface DeliveryDto {
+  id: string;
+  pregnancyId: string;
+  deliveredAt: string;
+  place: string;
+  mode: string;
+  outcome: string;
+  babyWeightKg: number | null;
+  babySex: string | null;
+  complications: string[];
+  version: number;
+  updatedAt: string;
+  deleted: boolean;
+}
+
+export function toDeliveryDto(delivery: Delivery): DeliveryDto {
+  return {
+    id: delivery.id,
+    pregnancyId: delivery.pregnancyId,
+    deliveredAt: delivery.deliveredAt.toISOString(),
+    place: delivery.place,
+    mode: delivery.mode,
+    outcome: delivery.outcome,
+    babyWeightKg: delivery.babyWeightKg,
+    babySex: delivery.babySex,
+    complications: delivery.complications as string[],
+    version: delivery.version,
+    updatedAt: delivery.updatedAt.toISOString(),
+    deleted: delivery.deleted,
+  };
+}
+
+// REQ-PREG-*. `gestationalAgeDays`/`nextContact` are computed on read, never
+// stored (backend.md A.2) - `contacts` is optional so callers that only have
+// the pregnancy row on hand (e.g. a PATCH response) can still serialize it,
+// at the cost of `nextContact` being null rather than computed.
+export interface PregnancyDto {
+  id: string;
+  patientId: string;
+  lmp: string | null;
+  edd: string;
+  gravida: number;
+  para: number;
+  riskFactors: string[];
+  riskLevel: string;
+  status: string;
+  birthPlan: Record<string, unknown> | null;
+  registeredByUserId: string;
+  gestationalAgeDays: number;
+  nextContact: AncContactDto | null;
+  version: number;
+  updatedAt: string;
+  deleted: boolean;
+}
+
+// REQ-PREG-008. Server-owned, not syncable (REQ-REMIND-009) - the client
+// only ever reads these.
+export interface ReminderDto {
+  id: string;
+  patientId: string;
+  pregnancyId: string | null;
+  kind: string;
+  dueAt: string;
+  channel: string;
+  recipientPhone: string;
+  recipientRole: string;
+  messageNp: string;
+  messageEn: string;
+  status: string;
+  sentAt: string | null;
+}
+
+export function toReminderDto(reminder: Reminder): ReminderDto {
+  return {
+    id: reminder.id,
+    patientId: reminder.patientId,
+    pregnancyId: reminder.pregnancyId,
+    kind: reminder.kind,
+    dueAt: reminder.dueAt.toISOString(),
+    channel: reminder.channel,
+    recipientPhone: reminder.recipientPhone,
+    recipientRole: reminder.recipientRole,
+    messageNp: reminder.messageNp,
+    messageEn: reminder.messageEn,
+    status: reminder.status,
+    sentAt: reminder.sentAt?.toISOString() ?? null,
+  };
+}
+
+export function toPregnancyDto(pregnancy: Pregnancy, contacts: AncContact[] = []): PregnancyDto {
+  const nextContact = contacts
+    .filter((c) => c.doneAt === null && !c.deleted)
+    .sort((a, b) => a.contactNo - b.contactNo)[0];
+
+  return {
+    id: pregnancy.id,
+    patientId: pregnancy.patientId,
+    lmp: pregnancy.lmp ? toDateOnly(pregnancy.lmp) : null,
+    edd: toDateOnly(pregnancy.edd),
+    gravida: pregnancy.gravida,
+    para: pregnancy.para,
+    riskFactors: pregnancy.riskFactors as string[],
+    riskLevel: pregnancy.riskLevel,
+    status: pregnancy.status,
+    birthPlan: pregnancy.birthPlan as Record<string, unknown> | null,
+    registeredByUserId: pregnancy.registeredByUserId,
+    gestationalAgeDays: gestationalAgeDays(toDateOnly(pregnancy.edd), new Date()),
+    nextContact: nextContact ? toAncContactDto(nextContact) : null,
+    version: pregnancy.version,
+    updatedAt: pregnancy.updatedAt.toISOString(),
+    deleted: pregnancy.deleted,
   };
 }
