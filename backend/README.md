@@ -20,9 +20,13 @@ conflicts, all 6 syncable tables including Documents metadata), and
 Documents (presigned S3 upload/download, upload-completion check,
 canRead/canAppend-gated, the Tier 2 AI document-summary worker) are all
 Tier 1 + the two specified Tier 2 backend features, built and verified.
-Demo seed data (`REQ-SEED-001/002/003`) is the main remaining gap — see
-`docs/FINAL_AUDIT.md` and `docs/PROGRESS.md`'s Session 15 entry for the
-exact per-requirement breakdown.
+`npm run seed` now seeds the full demo dataset (`REQ-SEED-001/002/003`):
+4 facilities, 3 invite codes, 3 demo users (PIN 1234), Sita/Ram/Aarav with
+Ram's clinical history and Sita's week-30 pregnancy, and the 40/61/50
+codelist target. The main remaining gap is the Phase 10 hardening/
+security re-audit — see `docs/FINAL_AUDIT.md` (now a stale Session 6
+snapshot) and `docs/PROGRESS.md`'s Session 16 entry for the exact
+per-requirement breakdown.
 
 ## Prerequisites
 
@@ -162,13 +166,25 @@ Presigning itself needs no network call and is exercised for real by
 | `make up` / `docker compose up -d` | start Postgres, Redis, MinIO (Docker path only) |
 | `make down` / `docker compose down` | stop them (Docker path only) |
 | `make migrate` / `npm run migrate` | apply pending Prisma migrations (dev) |
-| `make seed` / `npm run seed` | run `prisma/seed.ts` (currently a no-op placeholder — seed data isn't built yet) |
-| `npm run demo:reset` | reset the dev database and reseed (once seed data exists) |
+| `make seed` / `npm run seed` | seed the full demo dataset (facilities, invite codes, 3 demo users, Sita/Ram/Aarav with visits/pregnancy/document, codelists) — idempotent, safe to re-run |
+| `npm run demo:reset` | **destructive**: `prisma migrate reset --force` (drops and recreates the dev database) then reseeds — always confirm before running against a database with anything else in it |
 | `make test` / `npm run test` | run the vitest suite once |
 | `make check` / `npm run check` | format-check, lint, typecheck, test — must be green before any commit |
 | `npm run dev` | run the API with hot reload (`tsx watch`) |
 | `npm run build` / `npm run start` | compile to `dist/` and run the compiled output |
 | `npm run openapi:export` | regenerate `../docs/openapi.json` from the live route definitions |
+
+## Demo login (after `npm run seed`)
+
+| Phone | PIN | Role | Notes |
+|---|---|---|---|
+| `+9779801000001` | `1234` | patient | Owns Sita/Ram/Aarav. `OTP_MODE=demo` makes the OTP always `123456`. |
+| `+9779801000002` | `1234` | provider | Ramesh Thapa, Ghorahi Health Post. |
+| `+9779801000003` | `1234` | fchv | Kamala FCHV, Ghorahi Health Post. |
+
+Invite codes `HA-GHORAHI-01` (→ provider), `FCHV-W5-01` (→ fchv), and
+`ADMIN-01` (→ admin) are also seeded, unused, for demoing
+`POST /auth/provider/activate` live with a freshly-registered account.
 
 ## Running tests
 
