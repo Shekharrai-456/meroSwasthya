@@ -8,11 +8,12 @@ requirement-by-requirement status of what's actually built and verified.
 
 ## Current status
 
-Foundation, Auth (login/PIN/tokens/RBAC), Patients (family profiles), and
-Access Grants (QR sharing) are built and verified. Everything else in
-`docs/PROJECT_PLAN.md` (Visits, Sync, Maternal/ANC, Reminders, Documents,
-Facilities/code lists, seed data) is not yet started — see
-`docs/FINAL_AUDIT.md` for the exact per-requirement breakdown.
+Foundation, Auth (login/PIN/tokens/RBAC), Patients (family profiles), Access
+Grants (QR sharing), and Visits (clinical encounters, with a partial code
+list seed) are built and verified. Everything else in `docs/PROJECT_PLAN.md`
+(Sync, Maternal/ANC, Reminders, Documents, Facilities/code lists routes, the
+rest of seed data) is not yet started — see `docs/FINAL_AUDIT.md` and
+`docs/PROGRESS.md`'s Session 7 entry for the exact per-requirement breakdown.
 
 ## Prerequisites
 

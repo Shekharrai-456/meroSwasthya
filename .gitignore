@@ -4,6 +4,7 @@ build/
 coverage/
 .env
 *.log
+*.rdb
 .DS_Store
 Thumbs.db
 

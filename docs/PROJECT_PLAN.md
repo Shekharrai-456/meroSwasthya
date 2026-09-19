@@ -30,15 +30,15 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-FACILITY-001 | GET /facilities/nearby, Haversine | NOT_STARTED | `src/modules/facilities/routes.ts` | `test/facilities.test.ts` | |
 | REQ-FACILITY-002 | Facility fields | IMPLEMENTED (schema only) | `prisma/schema.prisma` | `test/facilities.test.ts` | pulled forward into Session 3 - `User.facilityId`/`InviteCode.facilityId` are hard FK dependencies on this table; no `/facilities/nearby` route or Haversine logic added |
 | REQ-CODELIST-001 | GET /codelists, versioned, cached | NOT_STARTED | `src/modules/codelists/routes.ts` | `test/codelists.test.ts` | |
-| REQ-CODELIST-002 | CodeListItem fields | NOT_STARTED | `prisma/schema.prisma` | `test/codelists.test.ts` | |
+| REQ-CODELIST-002 | CodeListItem fields | IMPLEMENTED (schema only) | `prisma/schema.prisma` | `test/visits.test.ts` (indirectly, via fixtures) | pulled forward into Session 7 - REQ-VISIT-004 (codes validated against codelist) is a hard dependency, same rationale as every earlier pull-forward in this file |
 | REQ-META-001 | GET /rules serves RULES verbatim | NOT_STARTED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | depends on `rules.json` existing (Phase 6) |
 | REQ-META-002 | GET /config feature flags | NOT_STARTED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | |
-| REQ-AUDIT-001 | AuditEntry written on 7 actions | IMPLEMENTED (partial) | `src/modules/audit/service.ts` (`logAudit`), called from `src/plugins/auth.ts` and `src/modules/grants/service.ts` | `test/patients.test.ts`, `test/grants.test.ts` | Session 6 correction: 4 of 7 actions are wired up (`record_viewed` since Session 4; `grant_created`/`grant_redeemed`/`grant_revoked` since Session 5, previously not reflected here). The remaining 3 (`visit_added`, `contact_recorded`, `document_added`) get their call sites when Visits/Maternal/Documents (Phase 5/7/9) are built |
+| REQ-AUDIT-001 | AuditEntry written on 7 actions | IMPLEMENTED (partial) | `src/modules/audit/service.ts` (`logAudit`), called from `src/plugins/auth.ts`, `src/modules/grants/service.ts`, `src/modules/visits/service.ts` | `test/patients.test.ts`, `test/grants.test.ts`, `test/visits.test.ts` | 5 of 7 actions are now wired up (`record_viewed` since Session 4; `grant_created`/`grant_redeemed`/`grant_revoked` since Session 5; `visit_added` since Session 7). The remaining 2 (`contact_recorded`, `document_added`) get their call sites when Maternal/Documents (Phase 7/9) are built |
 | REQ-AUDIT-002 | Audit rows immutable | IMPLEMENTED | `prisma/schema.prisma` (no `deleted` field, no update/delete code path on AuditEntry anywhere) | — | structurally enforced (nothing in the codebase can modify a row); no dedicated test since there's no code path to test against |
 | REQ-AUDIT-003 | GET /patients/:id/audit, owner-only | NOT_STARTED | `src/modules/patients/routes.ts` | `test/patients.test.ts` | endpoint lives in Patients module; row here since it's fundamentally an audit-read concern |
 | REQ-SEED-001 | Seed facilities/invites/users/patients/visits/pregnancy/sms | NOT_STARTED | `prisma/seed.ts` | manual: `npm run seed` then inspect | |
 | REQ-SEED-002 | demo:reset recomputes Sita's LMP | NOT_STARTED | `prisma/seed.ts`, `package.json` script | manual | |
-| REQ-SEED-003 | Seed 40/60/50 code lists | NOT_STARTED | `prisma/seed.ts` | `test/codelists.test.ts` (row count sanity) | |
+| REQ-SEED-003 | Seed 40/60/50 code lists | IMPLEMENTED (partial) | `prisma/seed.ts` | manual: `npm run seed` then inspect | Session 7: seeded 17 complaints/18 diagnoses/19 drugs, all real (not placeholder) codes, sufficient to exercise REQ-VISIT-004 and demo Visits end to end - short of the full 40/60/50 curated target, which is a content-authoring task independent of any module's logic |
 
 ## Phase 2 — Auth, RBAC, Users
 
@@ -117,15 +117,15 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-VISIT-001 | POST visits, canAppend && !fchv | NOT_STARTED | `src/modules/visits/routes.ts`, `service.ts` | `test/visits.test.ts` | |
-| REQ-VISIT-002 | Idempotent on id | NOT_STARTED | `src/modules/visits/service.ts` | `test/visits.test.ts` | |
-| REQ-VISIT-003 | Server fills provider fields | NOT_STARTED | `src/modules/visits/service.ts` | `test/visits.test.ts` | |
-| REQ-VISIT-004 | Codes validated against codelist | NOT_STARTED | `src/modules/visits/service.ts` | `test/visits.test.ts` | |
-| REQ-VISIT-005 | Follow-up reminder created | NOT_STARTED | `src/modules/visits/service.ts` | `test/visits.test.ts` | writes a `Reminder` row; worker itself is Phase 8 |
-| REQ-VISIT-006 | Audit visit_added | NOT_STARTED | `src/modules/visits/service.ts` | `test/visits.test.ts` | |
-| REQ-VISIT-007 | GET visits list | NOT_STARTED | `src/modules/visits/routes.ts` | `test/visits.test.ts` | |
-| REQ-VISIT-008 | Append-only, supersedesId | NOT_STARTED | `prisma/schema.prisma` | `test/visits.test.ts` | |
-| REQ-VISIT-009 | Embedded vitals/diagnoses/prescriptions | NOT_STARTED | `prisma/schema.prisma` | `test/visits.test.ts` | |
+| REQ-VISIT-001 | POST visits, canAppend && !fchv | VERIFIED | `src/modules/visits/routes.ts`, `service.ts` | `test/visits.test.ts` | fchv-with-append-grant, read-only-grant, no-grant, expired-grant, revoked-grant all covered |
+| REQ-VISIT-002 | Idempotent on id | VERIFIED | `src/modules/visits/service.ts` | `test/visits.test.ts` | same id under a different patient is rejected FORBIDDEN, not silently reassigned |
+| REQ-VISIT-003 | Server fills provider fields | VERIFIED | `src/modules/visits/service.ts` | `test/visits.test.ts` | "Self-reported" keyed on `actor.id === patient.ownerUserId`, not role - see service.ts's comment for why that's equivalent here |
+| REQ-VISIT-004 | Codes validated against codelist | VERIFIED | `src/modules/visits/service.ts` | `test/visits.test.ts` | validation logic itself is complete; the codelist it validates against is only partially seeded - see REQ-CODELIST-002/REQ-SEED-003 |
+| REQ-VISIT-005 | Follow-up reminder created | VERIFIED | `src/modules/visits/service.ts` | `test/visits.test.ts` | writes a `Reminder` row (pulled forward, schema only, from Phase 8 - see `prisma/schema.prisma`); worker/SMS delivery itself stays Phase 8. Message text is a minimal real inline bilingual string, not the full Phase 8 `templates.ts` (no BS-date conversion yet - see docs/PROGRESS.md's Session 7 entry) |
+| REQ-VISIT-006 | Audit visit_added | VERIFIED | `src/modules/visits/service.ts` | `test/visits.test.ts` | |
+| REQ-VISIT-007 | GET visits list | VERIFIED | `src/modules/visits/routes.ts` | `test/visits.test.ts` | |
+| REQ-VISIT-008 | Append-only, supersedesId | IMPLEMENTED | `prisma/schema.prisma` | — | structurally enforced (no update/delete route exists for Visit at all, same as REQ-AUDIT-002's precedent) - no dedicated test since there's no mutation code path to test against |
+| REQ-VISIT-009 | Embedded vitals/diagnoses/prescriptions | VERIFIED | `prisma/schema.prisma`, `src/lib/serializers.ts` | `test/visits.test.ts` | |
 | REQ-VISIT-010 | Add-visit form UI | OUT-OF-REPO (frontend) | — | — | frontend.md S22 |
 | REQ-VISIT-011 | fchv-hidden medicines section UI | OUT-OF-REPO (frontend) | — | — | moot per Question 1 — fchv never reaches this screen |
 

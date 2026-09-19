@@ -8,6 +8,7 @@ import { healthPlugin } from './health.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { grantsRoutes } from './modules/grants/routes.js';
 import { patientsRoutes } from './modules/patients/routes.js';
+import { visitsRoutes } from './modules/visits/routes.js';
 import { envelopePlugin } from './plugins/envelope.js';
 import { rateLimitPlugin } from './plugins/ratelimit.js';
 
@@ -86,6 +87,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(authRoutes, { prefix: '/api/v1' });
   await app.register(patientsRoutes, { prefix: '/api/v1' });
   await app.register(grantsRoutes, { prefix: '/api/v1' });
+  await app.register(visitsRoutes, { prefix: '/api/v1' });
 
   return app;
 }

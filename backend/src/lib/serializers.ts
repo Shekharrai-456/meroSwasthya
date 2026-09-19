@@ -1,4 +1,10 @@
-import type { AccessGrant, AuditEntry, Patient, Prisma } from '../../generated/prisma/client.js';
+import type {
+  AccessGrant,
+  AuditEntry,
+  Patient,
+  Prisma,
+  Visit,
+} from '../../generated/prisma/client.js';
 import { toDateOnly } from './dates.js';
 
 // The only place a User row becomes API JSON (REQ-API-007, REQ-USER-002).
@@ -122,5 +128,67 @@ export function toGrantDto(grant: AccessGrant): GrantDto {
     accessUntil: grant.accessUntil?.toISOString() ?? null,
     revokedAt: grant.revokedAt?.toISOString() ?? null,
     createdAt: grant.createdAt.toISOString(),
+  };
+}
+
+// REQ-VISIT-009: Prescription is embedded JSON on Visit, never a separate
+// table/row - "never sent alone" per backend.md A.2, so it has no id-based
+// lookup or its own serializer entry point, only this shape.
+export interface PrescriptionDto {
+  id: string;
+  drugCode: string;
+  drugName: string;
+  dose: string;
+  frequency: string;
+  durationDays: number;
+  instructionsNp: string | null;
+}
+
+// REQ-VISIT-001..009. Same whitelist-only discipline as every other DTO -
+// vitals/diagnosisCodes/referral/prescriptions are typed Json columns cast to
+// their documented shape, matching backend.md A.2 exactly.
+export interface VisitDto {
+  id: string;
+  patientId: string;
+  providerUserId: string;
+  providerName: string;
+  facilityId: string | null;
+  facilityName: string | null;
+  visitAt: string;
+  chiefComplaintCode: string;
+  vitals: Record<string, unknown>;
+  diagnosisCodes: string[];
+  notes: string | null;
+  advice: string | null;
+  followUpAt: string | null;
+  referral: Record<string, unknown> | null;
+  prescriptions: PrescriptionDto[];
+  supersedesId: string | null;
+  version: number;
+  updatedAt: string;
+  deleted: boolean;
+}
+
+export function toVisitDto(visit: Visit): VisitDto {
+  return {
+    id: visit.id,
+    patientId: visit.patientId,
+    providerUserId: visit.providerUserId,
+    providerName: visit.providerName,
+    facilityId: visit.facilityId,
+    facilityName: visit.facilityName,
+    visitAt: visit.visitAt.toISOString(),
+    chiefComplaintCode: visit.chiefComplaintCode,
+    vitals: visit.vitals as Record<string, unknown>,
+    diagnosisCodes: visit.diagnosisCodes as string[],
+    notes: visit.notes,
+    advice: visit.advice,
+    followUpAt: visit.followUpAt ? toDateOnly(visit.followUpAt) : null,
+    referral: visit.referral as Record<string, unknown> | null,
+    prescriptions: visit.prescriptions as unknown as PrescriptionDto[],
+    supersedesId: visit.supersedesId,
+    version: visit.version,
+    updatedAt: visit.updatedAt.toISOString(),
+    deleted: visit.deleted,
   };
 }

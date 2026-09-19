@@ -1803,6 +1803,557 @@
           }
         }
       }
+    },
+    "/patients/{id}/visits": {
+      "post": {
+        "summary": "Record a clinical visit",
+        "tags": [
+          "visits"
+        ],
+        "description": "REQ-VISIT-001..006/009. Requires canAppendPatient AND role != fchv. Idempotent on the client-generated id. Creates a follow_up Reminder when followUpAt is set, and logs visit_added.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "visitAt": {
+                    "type": "string"
+                  },
+                  "chiefComplaintCode": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "vitals": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "bpSys": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "bpDia": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "pulse": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "tempC": {
+                        "type": "number"
+                      },
+                      "weightKg": {
+                        "type": "number"
+                      },
+                      "spo2": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "diagnosisCodes": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "notes": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "advice": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "followUpAt": {
+                    "nullable": true,
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "referral": {
+                    "nullable": true,
+                    "type": "object",
+                    "properties": {
+                      "facilityId": {
+                        "type": "string"
+                      },
+                      "facilityName": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "urgency": {
+                        "type": "string",
+                        "enum": [
+                          "routine",
+                          "urgent"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "facilityName",
+                      "reason",
+                      "urgency"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "prescriptions": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "drugCode": {
+                          "type": "string"
+                        },
+                        "drugName": {
+                          "type": "string"
+                        },
+                        "dose": {
+                          "type": "string"
+                        },
+                        "frequency": {
+                          "type": "string",
+                          "enum": [
+                            "OD",
+                            "BD",
+                            "TDS",
+                            "QID",
+                            "SOS",
+                            "HS"
+                          ]
+                        },
+                        "durationDays": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true,
+                          "maximum": 9007199254740991
+                        },
+                        "instructionsNp": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "drugCode",
+                        "drugName",
+                        "dose",
+                        "frequency",
+                        "durationDays"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "supersedesId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "visitAt",
+                  "chiefComplaintCode",
+                  "vitals",
+                  "diagnosisCodes",
+                  "prescriptions"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visit": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "providerUserId": {
+                              "type": "string"
+                            },
+                            "providerName": {
+                              "type": "string"
+                            },
+                            "facilityId": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "facilityName": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "visitAt": {
+                              "type": "string"
+                            },
+                            "chiefComplaintCode": {
+                              "type": "string"
+                            },
+                            "vitals": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "diagnosisCodes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "notes": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "advice": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "followUpAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "referral": {
+                              "nullable": true,
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "prescriptions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "drugCode": {
+                                    "type": "string"
+                                  },
+                                  "drugName": {
+                                    "type": "string"
+                                  },
+                                  "dose": {
+                                    "type": "string"
+                                  },
+                                  "frequency": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OD",
+                                      "BD",
+                                      "TDS",
+                                      "QID",
+                                      "SOS",
+                                      "HS"
+                                    ]
+                                  },
+                                  "durationDays": {
+                                    "type": "number"
+                                  },
+                                  "instructionsNp": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "drugCode",
+                                  "drugName",
+                                  "dose",
+                                  "frequency",
+                                  "durationDays",
+                                  "instructionsNp"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "supersedesId": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "providerUserId",
+                            "providerName",
+                            "facilityId",
+                            "facilityName",
+                            "visitAt",
+                            "chiefComplaintCode",
+                            "vitals",
+                            "diagnosisCodes",
+                            "notes",
+                            "advice",
+                            "followUpAt",
+                            "referral",
+                            "prescriptions",
+                            "supersedesId",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "visit"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List visits for a patient",
+        "tags": [
+          "visits"
+        ],
+        "description": "REQ-VISIT-007. canRead-gated (REQ-ROLE-003), newest first, default/max limit 50/200.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "patientId": {
+                                "type": "string"
+                              },
+                              "providerUserId": {
+                                "type": "string"
+                              },
+                              "providerName": {
+                                "type": "string"
+                              },
+                              "facilityId": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "facilityName": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "visitAt": {
+                                "type": "string"
+                              },
+                              "chiefComplaintCode": {
+                                "type": "string"
+                              },
+                              "vitals": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "diagnosisCodes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "notes": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "advice": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "followUpAt": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "referral": {
+                                "nullable": true,
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "prescriptions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "drugCode": {
+                                      "type": "string"
+                                    },
+                                    "drugName": {
+                                      "type": "string"
+                                    },
+                                    "dose": {
+                                      "type": "string"
+                                    },
+                                    "frequency": {
+                                      "type": "string",
+                                      "enum": [
+                                        "OD",
+                                        "BD",
+                                        "TDS",
+                                        "QID",
+                                        "SOS",
+                                        "HS"
+                                      ]
+                                    },
+                                    "durationDays": {
+                                      "type": "number"
+                                    },
+                                    "instructionsNp": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "drugCode",
+                                    "drugName",
+                                    "dose",
+                                    "frequency",
+                                    "durationDays",
+                                    "instructionsNp"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "supersedesId": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "number"
+                              },
+                              "updatedAt": {
+                                "type": "string"
+                              },
+                              "deleted": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "patientId",
+                              "providerUserId",
+                              "providerName",
+                              "facilityId",
+                              "facilityName",
+                              "visitAt",
+                              "chiefComplaintCode",
+                              "vitals",
+                              "diagnosisCodes",
+                              "notes",
+                              "advice",
+                              "followUpAt",
+                              "referral",
+                              "prescriptions",
+                              "supersedesId",
+                              "version",
+                              "updatedAt",
+                              "deleted"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "servers": [

@@ -42,6 +42,7 @@ model Facility {
 
   users       User[]
   inviteCodes InviteCode[]
+  visits      Visit[]
 
   @@map("facilities")
 }
@@ -69,6 +70,7 @@ model User {
   patientsOwned        Patient[]
   accessGrantsRedeemed AccessGrant[]
   auditEntriesActed    AuditEntry[]
+  visitsRecorded       Visit[]
 
   @@map("users")
 }
@@ -137,6 +139,8 @@ model Patient {
 
   accessGrants AccessGrant[]
   auditEntries AuditEntry[]
+  visits       Visit[]
+  reminders    Reminder[]
 
   @@index([ownerUserId])
   @@index([updatedAt])
@@ -210,4 +214,108 @@ model AuditEntry {
 
   @@index([patientId, at])
   @@map("audit_entries")
+}
+
+// Session 7 (Phase 5 - Visits).
+
+// Pulled forward from its documented Phase 1 slot, same rationale as every
+// earlier pull-forward in this file: REQ-VISIT-004 ("codes validated against
+// codelist, else 400") is a hard dependency of Visits. Only the schema and a
+// working (non-exhaustive) seed of the codes this build actually exercises
+// are added now - GET /codelists (REQ-CODELIST-001) and REQ-SEED-003's full
+// 40/60/50-code demo target stay NOT_STARTED/partial. See
+// docs/PROGRESS.md's Session 7 entry.
+model CodeListItem {
+  kind    String
+  code    String
+  labelEn String @map("label_en")
+  labelNp String @map("label_np")
+  meta    Json?
+
+  @@id([kind, code])
+  @@map("codelist_items")
+}
+
+enum ReminderKind {
+  anc_due
+  anc_missed
+  follow_up
+  medicine
+}
+
+enum Channel {
+  sms
+  push
+}
+
+enum ReminderStatus {
+  pending
+  sent
+  failed
+  cancelled
+}
+
+// Pulled forward from its documented Phase 8 slot: REQ-VISIT-005 ("if
+// followUpAt is set, create a follow_up Reminder") is a hard dependency of
+// Visits. Only the columns Visits actually writes are added now.
+// `pregnancyId` is part of the full backend.md §6 shape but is used only by
+// Phase 7's anc_due/anc_missed reminders, which reference a Pregnancy table
+// that doesn't exist yet - deferred to that phase's migration, same
+// "schema only, only what's needed now" discipline as every earlier
+// pull-forward. The reminder worker (REQ-REMIND-001..003), SMS delivery, and
+// GET /patients/:id/reminders (REQ-REMIND-005) all stay NOT_STARTED - this
+// table is written to, never read from, by anything in this build so far.
+model Reminder {
+  id             String         @id @default(uuid())
+  patientId      String         @map("patient_id")
+  patient        Patient        @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  refId          String?        @map("ref_id")
+  kind           ReminderKind
+  dueAt          DateTime       @map("due_at")
+  channel        Channel        @default(sms)
+  recipientPhone String         @map("recipient_phone")
+  recipientRole  String         @map("recipient_role")
+  messageNp      String         @map("message_np")
+  messageEn      String         @map("message_en")
+  status         ReminderStatus @default(pending)
+  sentAt         DateTime?      @map("sent_at")
+
+  // @@index([status, dueAt]) is the documented worker-poll index
+  // (REQ-REMIND-001); not added yet since nothing queries by it until the
+  // worker exists (Phase 8) - avoids an unused index, added there instead.
+  @@index([patientId])
+  @@map("reminders")
+}
+
+// REQ-VISIT-001..009.
+model Visit {
+  id                 String    @id
+  patientId          String    @map("patient_id")
+  patient            Patient   @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  providerUserId     String    @map("provider_user_id")
+  providerUser       User      @relation(fields: [providerUserId], references: [id], onDelete: Restrict)
+  providerName       String    @map("provider_name")
+  facilityId         String?   @map("facility_id")
+  facility           Facility? @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  facilityName       String?   @map("facility_name")
+  visitAt            DateTime  @map("visit_at")
+  chiefComplaintCode String    @map("chief_complaint_code")
+  vitals             Json      @default("{}")
+  diagnosisCodes     Json      @default("[]") @map("diagnosis_codes")
+  notes              String?
+  advice             String?
+  followUpAt         DateTime? @db.Date @map("follow_up_at")
+  referral           Json?
+  prescriptions      Json      @default("[]")
+  // Self-referential by convention, not an FK (docs/DATA_MODEL.md §5) - a
+  // corrected visit may reference a visit id that predates this constraint
+  // set, and nothing requires enforcing referential integrity on it.
+  supersedesId       String?   @map("supersedes_id")
+  version            Int       @default(1)
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deleted            Boolean   @default(false)
+
+  @@index([patientId, visitAt])
+  @@index([updatedAt])
+  @@map("visits")
 }

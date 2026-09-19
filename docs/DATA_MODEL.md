@@ -253,6 +253,8 @@ The `pregnancyId @unique` constraint is the DB-level backing for REQ-PREG-015's 
 
 Indexes: `@@index([status, dueAt])` — the worker's poll query (REQ-REMIND-001), already in `backend.md`. **Added index (not in `backend.md`'s literal schema):** `@@index([patientId])` — required by `GET /patients/:id/reminders` (REQ-REMIND-005), which has no other index to use without one; its absence in the original schema would force a full-table scan as reminder volume grows.
 
+**Session 7 pull-forward note:** the table itself was built early (Phase 5 - Visits needs it for `REQ-VISIT-005`'s follow-up reminder), without waiting for Phase 8. Only the columns Visits actually writes exist so far - `pregnancyId` is deferred to Phase 7 (see `prisma/schema.prisma`'s comment on the model; it would reference a `Pregnancy` table that doesn't exist yet). `@@index([status, dueAt])` is deferred to Phase 8 alongside it: nothing queries by it until the reminder worker (`REQ-REMIND-001`) exists, so building it now would be an unused index with only write-side cost. `@@index([patientId])` is built now since `Visits` (indirectly, via a future `GET /patients/:id/reminders`) and this pull-forward both need patient-scoped lookups to stay efficient.
+
 ### Facility (REQ-FACILITY-*)
 
 **Schema built in Session 3, not Phase 1 (where this row still lives in `docs/PROJECT_PLAN.md`):** `User.facilityId` and `InviteCode.facilityId` are both FKs into this table, so it has to exist before either of those tables can be migrated. Only the columns below are built now — `GET /facilities/nearby`, the Haversine query, and seed data are still Phase 1/NOT_STARTED.
