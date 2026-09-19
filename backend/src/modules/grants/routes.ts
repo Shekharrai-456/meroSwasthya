@@ -25,7 +25,8 @@ export async function grantsRoutes(app: FastifyInstance): Promise<void> {
       serializerCompiler: noopSerializerCompiler,
       schema: docSchema({
         summary: 'Create an access grant (QR share)',
-        description: 'REQ-GRANT-001/002. Owner-only, rate-limited 20/hour/patient.',
+        description:
+          'REQ-GRANT-001/002/012. Owner-only, rate-limited 20/hour/patient. Pass `printed: true` for the 1-year printed-card variant (forces scope="read", requires the patient PIN at redeem) instead of `scope`/`ttlMinutes`.',
         tags: ['grants'],
         body: grantCreateSchema,
         response200: grantCreateResponseSchema,
@@ -47,7 +48,7 @@ export async function grantsRoutes(app: FastifyInstance): Promise<void> {
       schema: docSchema({
         summary: 'Redeem a scanned grant QR code',
         description:
-          'REQ-GRANT-003..007. Role must be provider or fchv. Idempotent for the redeeming user; 409 ALREADY_REDEEMED for anyone else.',
+          "REQ-GRANT-003..007/012. Role must be provider or fchv. Idempotent for the redeeming user; 409 ALREADY_REDEEMED for anyone else. A printed-card grant additionally requires the patient's 4-digit `pin` in the body on first redemption.",
         tags: ['grants'],
         body: grantRedeemSchema,
         response200: grantRedeemResponseSchema,

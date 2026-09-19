@@ -175,6 +175,10 @@ model AccessGrant {
   accessUntil      DateTime?  @map("access_until")
   revokedAt        DateTime?  @map("revoked_at")
   createdAt        DateTime   @default(now()) @map("created_at")
+  // REQ-GRANT-012 (Tier 2): the printed fallback card - a 1-year-lived
+  // token whose redemption additionally requires the patient's PIN
+  // (backend.md A.7). Server-set only, never client-controlled directly.
+  printed          Boolean    @default(false)
 
   @@index([patientId, redeemedByUserId, accessUntil])
   // Session 6 performance audit finding: REQ-ROLE-007's GET /patients list

@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GrantScope, Role } from '../generated/prisma/enums.js';
 import { buildApp } from '../src/app.js';
+import { config } from '../src/config.js';
 import { prisma } from '../src/lib/prisma.js';
 import {
   completeDocument,
   getDocument,
+  summarizeDocument,
   updateDocumentMetadata,
 } from '../src/modules/documents/service.js';
 import type { DocumentStorage } from '../src/modules/documents/storage.js';
@@ -34,6 +36,10 @@ function fakeStorage(overrides: Partial<DocumentStorage> = {}): DocumentStorage 
     presignUpload: async (key) => `https://fake-s3.test/${key}?upload=1`,
     presignDownload: async (key) => `https://fake-s3.test/${key}?download=1`,
     headObject: async () => ({ exists: true, contentLength: 12345 }),
+    downloadObject: async () => ({
+      buffer: Buffer.from('fake-jpeg-bytes'),
+      contentType: 'image/jpeg',
+    }),
     ...overrides,
   };
 }
@@ -340,6 +346,91 @@ describe('documents module', () => {
       const res = await owner.post(`/api/v1/documents/${documentId}/summarize`);
       expect(res.statusCode).toBe(501);
       expect(res.json().error.code).toBe('NOT_IMPLEMENTED');
+    });
+  });
+
+  // REQ-DOC-007. `config` is a plain object (never frozen), so these tests
+  // flip `AI_MODE` for their own duration and restore it - the alternative
+  // (a real AI_MODE=on server instance) would need a real ANTHROPIC_API_KEY
+  // just to boot (config.ts's own `.refine()`), which this environment
+  // doesn't have. `summarizeDocument` is called directly (bypassing HTTP)
+  // with a fake `enqueue`, same seam `storage` already provides - the route
+  // itself is a two-line pass-through with nothing else to test.
+  describe('summarizeDocument with AI_MODE=on (REQ-DOC-007)', () => {
+    const originalAiMode = config.AI_MODE;
+
+    beforeEach(() => {
+      config.AI_MODE = 'on';
+    });
+
+    afterEach(() => {
+      config.AI_MODE = originalAiMode;
+    });
+
+    it('flips aiSummaryStatus to queued and enqueues a job', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post('/api/v1/patients', samplePatientPayload());
+      const patientId = patientRes.json().data.patient.id;
+      const presignRes = await owner.post(
+        '/api/v1/documents/presign',
+        samplePresignBody(patientId),
+      );
+      const documentId = presignRes.json().data.document.id;
+      const actor = { id: owner.user.id, role: owner.user.role, facilityId: owner.user.facilityId };
+      await completeDocument(actor, documentId, fakeStorage());
+
+      const enqueued: string[] = [];
+      const updated = await summarizeDocument(actor, documentId, async (id) => {
+        enqueued.push(id);
+      });
+      expect(updated.aiSummaryStatus).toBe('queued');
+      expect(enqueued).toEqual([documentId]);
+
+      const row = await prisma.document.findUniqueOrThrow({ where: { id: documentId } });
+      expect(row.aiSummaryStatus).toBe('queued');
+    });
+
+    it('rejects summarizing a document that has not finished uploading', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post('/api/v1/patients', samplePatientPayload());
+      const patientId = patientRes.json().data.patient.id;
+      const presignRes = await owner.post(
+        '/api/v1/documents/presign',
+        samplePresignBody(patientId),
+      );
+      const documentId = presignRes.json().data.document.id;
+      const actor = { id: owner.user.id, role: owner.user.role, facilityId: owner.user.facilityId };
+
+      await expect(summarizeDocument(actor, documentId, async () => {})).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+      });
+    });
+
+    it('rejects a caller with no read access (403)', async () => {
+      const owner = await asUser(app, Role.patient);
+      const stranger = await asUser(app, Role.provider);
+      const patientRes = await owner.post('/api/v1/patients', samplePatientPayload());
+      const patientId = patientRes.json().data.patient.id;
+      const presignRes = await owner.post(
+        '/api/v1/documents/presign',
+        samplePresignBody(patientId),
+      );
+      const documentId = presignRes.json().data.document.id;
+      const ownerActor = {
+        id: owner.user.id,
+        role: owner.user.role,
+        facilityId: owner.user.facilityId,
+      };
+      await completeDocument(ownerActor, documentId, fakeStorage());
+
+      const strangerActor = {
+        id: stranger.user.id,
+        role: stranger.user.role,
+        facilityId: stranger.user.facilityId,
+      };
+      await expect(
+        summarizeDocument(strangerActor, documentId, async () => {}),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
   });
 

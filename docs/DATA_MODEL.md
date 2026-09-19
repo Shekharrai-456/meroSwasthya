@@ -109,6 +109,7 @@ Indexes: `@@index([ownerUserId])` — `GET /patients` owned-list (REQ-ROLE-007).
 | accessUntil | timestamptz? | set on redeem, +24h (REQ-GRANT-006) |
 | revokedAt | timestamptz? | |
 | createdAt | timestamptz | `@default(now())` |
+| printed | boolean | default `false`. REQ-GRANT-012 (Tier 2, Session 15) — set only via `POST /grants` with `printed: true`; gates the additional PIN check at redeem (`grants/service.ts`'s `redeemGrant`) |
 
 Indexes: `@@index([patientId, redeemedByUserId, accessUntil])` — the exact tuple `canReadPatient`/`canAppendPatient` filter on (REQ-ROLE-003/004), on every authorized request.
 

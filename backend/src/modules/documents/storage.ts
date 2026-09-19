@@ -15,10 +15,19 @@ export interface HeadResult {
   contentLength: number | null;
 }
 
+export interface DownloadedObject {
+  buffer: Buffer;
+  contentType: string;
+}
+
 export interface DocumentStorage {
   presignUpload(objectKey: string, contentType: string): Promise<string>;
   presignDownload(objectKey: string): Promise<string>;
   headObject(objectKey: string): Promise<HeadResult>;
+  // REQ-DOC-007: the AI worker needs the actual bytes server-side (to send
+  // to the vision API) - unlike every other storage operation, which only
+  // ever hands the client a URL to talk to S3 directly.
+  downloadObject(objectKey: string): Promise<DownloadedObject>;
 }
 
 const UPLOAD_TTL_SEC = 15 * 60; // REQ-DOC-003
@@ -51,6 +60,23 @@ export const s3Storage: DocumentStorage = {
       // conservative answer for REQ-DOC-004's upload-completion check.
       return { exists: false, contentLength: null };
     }
+  },
+
+  async downloadObject(objectKey) {
+    const result = await s3Client.send(
+      new GetObjectCommand({ Bucket: config.S3_BUCKET, Key: objectKey }),
+    );
+    if (!result.Body) {
+      throw new Error(`Object "${objectKey}" has no body`);
+    }
+    // AWS SDK v3's response Body carries a `transformToByteArray()` helper
+    // (the SdkStreamMixin) in the Node runtime - no manual stream-to-buffer
+    // plumbing needed.
+    const bytes = await result.Body.transformToByteArray();
+    return {
+      buffer: Buffer.from(bytes),
+      contentType: result.ContentType ?? 'application/octet-stream',
+    };
   },
 };
 

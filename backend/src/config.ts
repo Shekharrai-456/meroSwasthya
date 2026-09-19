@@ -64,6 +64,12 @@ const envSchema = z
   .refine((value) => value.JWT_SECRET !== value.GRANT_SECRET, {
     message: 'JWT_SECRET and GRANT_SECRET must be different from each other',
     path: ['GRANT_SECRET'],
+  })
+  // REQ-DOC-007: fail loudly at startup, not on the first real summarize
+  // call, if AI_MODE=on was flipped without actually setting a key.
+  .refine((value) => value.AI_MODE === 'off' || !!value.ANTHROPIC_API_KEY, {
+    message: 'ANTHROPIC_API_KEY is required when AI_MODE=on',
+    path: ['ANTHROPIC_API_KEY'],
   });
 
 export type AppConfig = z.infer<typeof envSchema> & {

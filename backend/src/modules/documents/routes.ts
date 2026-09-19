@@ -82,7 +82,7 @@ export async function documentsRoutes(app: FastifyInstance): Promise<void> {
       schema: docSchema({
         summary: 'Request an AI draft summary (Tier 2)',
         description:
-          'REQ-DOC-006/007. 501 NOT_IMPLEMENTED when AI_MODE=off, or until the Tier 2 AI worker is built.',
+          'REQ-DOC-006/007. 501 NOT_IMPLEMENTED when AI_MODE=off. Otherwise queues the ai-summary job and returns immediately with aiSummaryStatus=queued; poll GET /documents/:id for aiSummaryStatus=done/failed.',
         tags: ['documents'],
         response200: documentWrapperResponseSchema,
       }),

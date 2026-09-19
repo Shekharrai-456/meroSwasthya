@@ -12,6 +12,7 @@ export const grantDtoSchema = z.object({
   accessUntil: z.string().nullable(),
   revokedAt: z.string().nullable(),
   createdAt: z.string(),
+  printed: z.boolean(),
 });
 
 export const grantCreateResponseSchema = z.object({

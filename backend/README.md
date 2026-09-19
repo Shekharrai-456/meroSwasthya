@@ -10,17 +10,19 @@ requirement-by-requirement status of what's actually built and verified.
 
 Foundation, Auth (login/PIN/tokens/RBAC), Patients (family profiles, computed
 summary block, unified timeline), Access Grants (QR sharing, full offline
-redeem bundle), Visits (clinical encounters), Maternal (pregnancy
-registration, the 8-contact ANC schedule, server-side triage, delivery),
-Facilities/code lists/meta (nearby search, picklists, the shared rules
-table, feature flags), Reminders & SMS (60s worker, mock/Sparrow adapters,
-bilingual BS-date templates, demo SMS panel), Sync (push/pull, per-op
-idempotency, optimistic-concurrency conflicts, all 6 syncable tables
-including Documents metadata), and Documents (presigned S3 upload/download,
-upload-completion check, canRead/canAppend-gated) are built and verified.
-The Tier 2 AI document-summary worker and most seed data are not yet
-started — see `docs/FINAL_AUDIT.md` and `docs/PROGRESS.md`'s Session 14
-entry for the exact per-requirement breakdown.
+redeem bundle, the Tier 2 printed long-lived QR + PIN redeem), Visits
+(clinical encounters), Maternal (pregnancy registration, the 8-contact ANC
+schedule, server-side triage, delivery), Facilities/code lists/meta (nearby
+search, picklists, the shared rules table, feature flags), Reminders & SMS
+(60s worker, mock/Sparrow adapters, bilingual BS-date templates, demo SMS
+panel), Sync (push/pull, per-op idempotency, optimistic-concurrency
+conflicts, all 6 syncable tables including Documents metadata), and
+Documents (presigned S3 upload/download, upload-completion check,
+canRead/canAppend-gated, the Tier 2 AI document-summary worker) are all
+Tier 1 + the two specified Tier 2 backend features, built and verified.
+Demo seed data (`REQ-SEED-001/002/003`) is the main remaining gap — see
+`docs/FINAL_AUDIT.md` and `docs/PROGRESS.md`'s Session 15 entry for the
+exact per-requirement breakdown.
 
 ## Prerequisites
 

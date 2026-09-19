@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Role } from '../generated/prisma/enums.js';
 import { buildApp } from '../src/app.js';
 import { config } from '../src/config.js';
+import { hashPin } from '../src/lib/hash.js';
 import { prisma } from '../src/lib/prisma.js';
 import { asUser, testClient } from './helpers/client.js';
 import { resetDb, resetRedis } from './helpers/db.js';
@@ -163,6 +164,47 @@ describe('grants module', () => {
       }
       const res = await owner.post('/api/v1/grants', { patientId: patient.id, scope: 'read' });
       expect(res.statusCode).toBe(429);
+    });
+
+    it('400 VALIDATION_ERROR when scope is omitted and printed is not true', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patient = await createPatientAs(owner);
+      const res = await owner.post('/api/v1/grants', { patientId: patient.id });
+      expect(res.statusCode).toBe(400);
+    });
+
+    // REQ-GRANT-012 (Tier 2).
+    it('printed:true forces scope="read" and a 1-year ttl, regardless of what else is sent', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patient = await createPatientAs(owner);
+      const before = Date.now();
+      const res = await owner.post('/api/v1/grants', { patientId: patient.id, printed: true });
+      expect(res.statusCode).toBe(200);
+      const body = res.json().data;
+      expect(body.grant.scope).toBe('read');
+      expect(body.grant.printed).toBe(true);
+      const expiresAt = new Date(body.grant.expiresAt).getTime();
+      const oneYearMs = 525_600 * 60 * 1000;
+      expect(expiresAt).toBeGreaterThanOrEqual(before + oneYearMs - 5000);
+      expect(expiresAt).toBeLessThanOrEqual(before + oneYearMs + 5000);
+    });
+
+    it('rejects printed:true combined with an explicit ttlMinutes', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patient = await createPatientAs(owner);
+      const res = await owner.post('/api/v1/grants', {
+        patientId: patient.id,
+        printed: true,
+        ttlMinutes: 10,
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('an ordinary (non-printed) grant defaults printed to false', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patient = await createPatientAs(owner);
+      const res = await owner.post('/api/v1/grants', { patientId: patient.id, scope: 'read' });
+      expect(res.json().data.grant.printed).toBe(false);
     });
   });
 
@@ -364,6 +406,121 @@ describe('grants module', () => {
     it('401 with no token', async () => {
       const res = await testClient(app).post('/api/v1/grants/redeem', { qrPayload: 'SWC1:x' });
       expect(res.statusCode).toBe(401);
+    });
+  });
+
+  // REQ-GRANT-012 (Tier 2). `asUser` bypasses the OTP/PIN flow entirely
+  // (test/helpers/client.ts), so these tests set a real pinHash directly.
+  describe('POST /api/v1/grants/redeem printed cards (REQ-GRANT-012)', () => {
+    const PIN = '1234';
+
+    async function issuePrintedGrant(owner: Awaited<ReturnType<typeof asUser>>, patientId: string) {
+      const res = await owner.post('/api/v1/grants', { patientId, printed: true });
+      return res.json().data as { qrPayload: string; grant: { id: string; printed: boolean } };
+    }
+
+    it('rejects redemption with no pin at all', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+      await prisma.user.update({
+        where: { id: owner.user.id },
+        data: { pinHash: await hashPin(PIN) },
+      });
+      const { qrPayload } = await issuePrintedGrant(owner, patient.id);
+
+      const res = await provider.post('/api/v1/grants/redeem', { qrPayload });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects the wrong pin with 401 UNAUTHENTICATED', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+      await prisma.user.update({
+        where: { id: owner.user.id },
+        data: { pinHash: await hashPin(PIN) },
+      });
+      const { qrPayload } = await issuePrintedGrant(owner, patient.id);
+
+      const res = await provider.post('/api/v1/grants/redeem', { qrPayload, pin: '9999' });
+      expect(res.statusCode).toBe(401);
+      expect(res.json().error.code).toBe('UNAUTHENTICATED');
+    });
+
+    it('rejects when the patient owner has no PIN set at all', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+      const { qrPayload } = await issuePrintedGrant(owner, patient.id);
+
+      const res = await provider.post('/api/v1/grants/redeem', { qrPayload, pin: PIN });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('succeeds with the correct pin, granting the normal +24h access window (not 1 year)', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+      await prisma.user.update({
+        where: { id: owner.user.id },
+        data: { pinHash: await hashPin(PIN) },
+      });
+      const { qrPayload } = await issuePrintedGrant(owner, patient.id);
+
+      const before = Date.now();
+      const res = await provider.post('/api/v1/grants/redeem', { qrPayload, pin: PIN });
+      expect(res.statusCode).toBe(200);
+      const accessUntil = new Date(res.json().data.grant.accessUntil).getTime();
+      const oneDayMs = config.GRANT_ACCESS_WINDOW_H * 60 * 60 * 1000;
+      expect(accessUntil).toBeGreaterThanOrEqual(before + oneDayMs - 5000);
+      expect(accessUntil).toBeLessThanOrEqual(before + oneDayMs + 5000);
+    });
+
+    it('replaying the same redeemer does not require the pin again', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+      await prisma.user.update({
+        where: { id: owner.user.id },
+        data: { pinHash: await hashPin(PIN) },
+      });
+      const { qrPayload } = await issuePrintedGrant(owner, patient.id);
+
+      const first = await provider.post('/api/v1/grants/redeem', { qrPayload, pin: PIN });
+      expect(first.statusCode).toBe(200);
+      const second = await provider.post('/api/v1/grants/redeem', { qrPayload });
+      expect(second.statusCode).toBe(200);
+    });
+
+    it('locks out after 5 wrong-PIN attempts, mirroring PIN-login lockout', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+      await prisma.user.update({
+        where: { id: owner.user.id },
+        data: { pinHash: await hashPin(PIN) },
+      });
+      const { qrPayload } = await issuePrintedGrant(owner, patient.id);
+
+      for (let i = 0; i < 5; i++) {
+        const res = await provider.post('/api/v1/grants/redeem', { qrPayload, pin: '0000' });
+        expect(res.statusCode).toBe(401);
+      }
+      const locked = await provider.post('/api/v1/grants/redeem', { qrPayload, pin: PIN });
+      expect(locked.statusCode).toBe(429);
+    });
+
+    it('an ordinary grant never requires a pin, even if one is sent', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+      const res = await owner.post('/api/v1/grants', { patientId: patient.id, scope: 'append' });
+      const qrPayload = res.json().data.qrPayload as string;
+
+      const redeemRes = await provider.post('/api/v1/grants/redeem', { qrPayload });
+      expect(redeemRes.statusCode).toBe(200);
     });
   });
 

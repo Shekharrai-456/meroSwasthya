@@ -10,8 +10,9 @@ import {
   getActorAuditInfo,
 } from '../../plugins/auth.js';
 import { logAudit } from '../audit/service.js';
-import { buildObjectKey, type DocumentStorage, s3Storage } from './storage.js';
+import { enqueueAiSummaryJob } from './ai/worker.js';
 import type { DocumentMetadataUpdateInput, DocumentPresignInput } from './schemas.js';
+import { buildObjectKey, type DocumentStorage, s3Storage } from './storage.js';
 
 async function findPatientOrThrow(patientId: string) {
   const patient = await prisma.patient.findFirst({ where: { id: patientId, deleted: false } });
@@ -156,15 +157,17 @@ export async function updateDocumentMetadata(
   return toDocumentDto(updated);
 }
 
-// REQ-DOC-006: 501 when AI_MODE=off (the only configured state in this
-// build - no ANTHROPIC_API_KEY exists in this environment). The actual AI
-// worker (REQ-DOC-007) is Tier 2 and NOT_STARTED - queuing a job with
-// nothing that will ever process it would be exactly the fake
-// implementation CLAUDE.md §2 forbids, so `AI_MODE=on` is left unimplemented
-// here rather than half-built.
+// REQ-DOC-006/007: 501 when AI_MODE=off. Otherwise flips aiSummaryStatus to
+// queued and enqueues the real ai-summary job (documents/ai/{client,service,
+// worker}.ts) - the worker downloads the object, calls the vision LLM, and
+// sets status to done/failed asynchronously. `enqueue` is an injectable
+// param (default: the real BullMQ producer) purely so tests can assert a
+// job was requested without needing a live Redis/BullMQ connection at the
+// HTTP layer - the same seam `storage` already provides for S3.
 export async function summarizeDocument(
   actor: AuthenticatedUser,
   documentId: string,
+  enqueue: (documentId: string) => Promise<void> = enqueueAiSummaryJob,
 ): Promise<DocumentDto> {
   const document = await findDocumentOrThrow(documentId);
   await assertCanReadPatient(actor, document.patientId);
@@ -172,6 +175,16 @@ export async function summarizeDocument(
   if (config.AI_MODE === 'off') {
     throw new AppError(ErrorCode.NOT_IMPLEMENTED, 'AI summarisation is not enabled');
   }
-  // Tier 2, REQ-DOC-007 (AI worker) not built - see this function's own comment.
-  throw new AppError(ErrorCode.NOT_IMPLEMENTED, 'AI summarisation is not yet built (Tier 2)');
+  if (document.status !== 'uploaded') {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, 'Document has not finished uploading yet', [
+      { field: 'id', message: 'document is not uploaded' },
+    ]);
+  }
+
+  const updated = await prisma.document.update({
+    where: { id: documentId },
+    data: { aiSummaryStatus: 'queued' },
+  });
+  await enqueue(documentId);
+  return toDocumentDto(updated);
 }

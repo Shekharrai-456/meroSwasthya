@@ -1761,7 +1761,7 @@
         "tags": [
           "grants"
         ],
-        "description": "REQ-GRANT-001/002. Owner-only, rate-limited 20/hour/patient.",
+        "description": "REQ-GRANT-001/002/012. Owner-only, rate-limited 20/hour/patient. Pass `printed: true` for the 1-year printed-card variant (forces scope=\"read\", requires the patient PIN at redeem) instead of `scope`/`ttlMinutes`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1786,11 +1786,15 @@
                     "minimum": 0,
                     "exclusiveMinimum": true,
                     "maximum": 60
+                  },
+                  "printed": {
+                    "default": false,
+                    "type": "boolean"
                   }
                 },
                 "required": [
                   "patientId",
-                  "scope"
+                  "printed"
                 ],
                 "additionalProperties": false
               }
@@ -1854,6 +1858,9 @@
                             },
                             "createdAt": {
                               "type": "string"
+                            },
+                            "printed": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -1866,7 +1873,8 @@
                             "redeemedAt",
                             "accessUntil",
                             "revokedAt",
-                            "createdAt"
+                            "createdAt",
+                            "printed"
                           ],
                           "additionalProperties": false
                         },
@@ -1898,7 +1906,7 @@
         "tags": [
           "grants"
         ],
-        "description": "REQ-GRANT-003..007. Role must be provider or fchv. Idempotent for the redeeming user; 409 ALREADY_REDEEMED for anyone else.",
+        "description": "REQ-GRANT-003..007/012. Role must be provider or fchv. Idempotent for the redeeming user; 409 ALREADY_REDEEMED for anyone else. A printed-card grant additionally requires the patient's 4-digit `pin` in the body on first redemption.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1909,6 +1917,10 @@
                   "qrPayload": {
                     "type": "string",
                     "pattern": "^SWC1:.+$"
+                  },
+                  "pin": {
+                    "type": "string",
+                    "pattern": "^\\d{4}$"
                   }
                 },
                 "required": [
@@ -1976,6 +1988,9 @@
                             },
                             "createdAt": {
                               "type": "string"
+                            },
+                            "printed": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -1988,7 +2003,8 @@
                             "redeemedAt",
                             "accessUntil",
                             "revokedAt",
-                            "createdAt"
+                            "createdAt",
+                            "printed"
                           ],
                           "additionalProperties": false
                         },
@@ -2757,6 +2773,9 @@
                             },
                             "createdAt": {
                               "type": "string"
+                            },
+                            "printed": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -2769,7 +2788,8 @@
                             "redeemedAt",
                             "accessUntil",
                             "revokedAt",
-                            "createdAt"
+                            "createdAt",
+                            "printed"
                           ],
                           "additionalProperties": false
                         }
@@ -6438,7 +6458,7 @@
         "tags": [
           "documents"
         ],
-        "description": "REQ-DOC-006/007. 501 NOT_IMPLEMENTED when AI_MODE=off, or until the Tier 2 AI worker is built.",
+        "description": "REQ-DOC-006/007. 501 NOT_IMPLEMENTED when AI_MODE=off. Otherwise queues the ai-summary job and returns immediately with aiSummaryStatus=queued; poll GET /documents/:id for aiSummaryStatus=done/failed.",
         "parameters": [
           {
             "schema": {

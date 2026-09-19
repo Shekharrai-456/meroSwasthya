@@ -93,7 +93,7 @@ Type legend: F = functional, SEC = security, D = data/schema, NFR = non-function
 | REQ-GRANT-009 | The 24-hour access window is enforced on every subsequent read/append, not just at redeem time | backend.md A.6#16 | SEC | REQ-ROLE-003 | High | e.g. adding a visit 25 h after redeem → 403 `GRANT_EXPIRED` |
 | REQ-GRANT-010 | Frontend QR-share sheet (S08): shows a live 10-minute countdown from `grant.expiresAt` (using server time offset), with Regenerate and Revoke actions; requires network | frontend.md S08 | UX | REQ-GRANT-001, REQ-SYNC-020 | Low | |
 | REQ-GRANT-011 | Frontend scanner (S20) accepts only payloads starting with `SWC1:`; other QR codes are ignored with a toast; on success the bundle is written to the local DB with `access_until` set | frontend.md S20 | F | REQ-GRANT-007 | Low | |
-| REQ-GRANT-012 | Printed long-lived QR (`ttlMinutes = 525600`, `scope:"read"`) requires the patient's PIN in the redeem request body — **Tier 2** | backend.md A.7 | F | REQ-GRANT-003 | Low | Build only if time allows per the doc; see AMBIGUITIES A7 |
+| REQ-GRANT-012 | Printed long-lived QR (`ttlMinutes = 525600`, `scope:"read"`) requires the patient's PIN in the redeem request body — **Tier 2** | backend.md A.7 | F | REQ-GRANT-003 | Low | Built Session 15. See AMBIGUITIES A4 for the `accessUntil` semantics this was resolved against. |
 
 ## VISITS
 
@@ -298,7 +298,7 @@ Type legend: F = functional, SEC = security, D = data/schema, NFR = non-function
 
 **A3 — Related to C1**: even setting the route-guard question aside, it's unclear whether `fchv` should be able to *navigate to* `/provider/patient/:id/visit/new` at all (read-only view of past visits?) given the backend flatly rejects any write from that role.
 
-**A4 — Printed long-lived QR semantics.** `backend.md` A.7 gives the printed card a token `exp` of `ttlMinutes = 525600` (1 year) but doesn't clarify whether `accessUntil` after redeeming it is still the usual +24h window, or something longer/different given the token's own long lifetime.
+**A4 — Printed long-lived QR semantics.** `backend.md` A.7 gives the printed card a token `exp` of `ttlMinutes = 525600` (1 year) but doesn't clarify whether `accessUntil` after redeeming it is still the usual +24h window, or something longer/different given the token's own long lifetime. **Resolved (Session 15):** `accessUntil` is the same +24h window as every other grant. The token's own 1-year `exp` only governs how long the physical card stays *scannable*; the access it grants once redeemed is bounded exactly like an ordinary QR's, so a lost/photographed printed card doesn't grant standing year-long access, only a year-long *opportunity to attempt* a PIN-gated redemption. See `src/modules/grants/service.ts`'s `redeemGrant`.
 
 **A5 — Sync-push semantics for `documents`.** `backend.md` §9.7 says the `documents` table is syncable "meta only; status cannot be set to uploaded by client," but never lists which document fields are actually writable via a sync `upsert` op (title? takenAt? type?) versus only ever being created through `presign`/`complete`.
 

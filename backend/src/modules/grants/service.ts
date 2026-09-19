@@ -1,10 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import type { Patient } from '../../../generated/prisma/client.js';
-import { AuditAction } from '../../../generated/prisma/enums.js';
+import { AuditAction, GrantScope } from '../../../generated/prisma/enums.js';
 import { config } from '../../config.js';
 import { AppError, ErrorCode } from '../../lib/errors.js';
+import { DUMMY_PIN_HASH, verifyPin } from '../../lib/hash.js';
 import { prisma } from '../../lib/prisma.js';
-import { checkFixedWindowLimit } from '../../lib/rateLimiter.js';
+import {
+  checkFixedWindowLimit,
+  checkPinLockout,
+  clearPinLockout,
+  recordPinFailure,
+} from '../../lib/rateLimiter.js';
 import {
   type AncContactDto,
   type GrantDto,
@@ -19,7 +25,11 @@ import { type AuthenticatedUser, getActorAuditInfo } from '../../plugins/auth.js
 import { logAudit } from '../audit/service.js';
 import { type PatientSummary, buildPatientSummary } from '../patients/summary.js';
 import { type TimelineItemDto, buildPatientTimeline } from '../patients/timeline.js';
-import type { GrantCreateInput, GrantRedeemInput } from './schemas.js';
+import {
+  PRINTED_GRANT_TTL_MINUTES,
+  type GrantCreateInput,
+  type GrantRedeemInput,
+} from './schemas.js';
 
 // REQ-GRANT-001: 20 per patient per hour, independent of who is creating them
 // (always the owner, but keyed on the patient so the limit tracks the shared
@@ -68,23 +78,28 @@ export async function createGrant(
     );
   }
 
-  const ttlMinutes = input.ttlMinutes ?? config.GRANT_TTL_MIN_DEFAULT;
+  // REQ-GRANT-012: the printed card's scope/ttl are server-forced constants,
+  // never read from `input` even though the schema would reject a
+  // conflicting client value anyway - defense in depth against a future
+  // schema change accidentally loosening that guarantee.
+  const ttlMinutes = input.printed
+    ? PRINTED_GRANT_TTL_MINUTES
+    : (input.ttlMinutes ?? config.GRANT_TTL_MIN_DEFAULT);
+  const scope = input.printed ? GrantScope.read : (input.scope as GrantScope);
   const tokenJti = randomUUID();
   const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
   const grant = await prisma.accessGrant.create({
     data: {
       patientId: patient.id,
-      scope: input.scope,
+      scope,
       tokenJti,
       expiresAt,
+      printed: input.printed,
     },
   });
 
-  const token = await signGrantToken(
-    { gid: tokenJti, pid: patient.id, scope: input.scope },
-    ttlMinutes,
-  );
+  const token = await signGrantToken({ gid: tokenJti, pid: patient.id, scope }, ttlMinutes);
 
   const { name, facilityName } = await getActorAuditInfo(actor.id);
   await logAudit({
@@ -170,10 +185,45 @@ export async function redeemGrant(
   if (grant.redeemedByUserId === actor.id) {
     // Idempotent re-redeem: return the bundle again, no new audit row, no
     // accessUntil extension (a repeated scan shouldn't silently prolong
-    // access past the original 24h window).
+    // access past the original 24h window). No PIN re-check either - the
+    // PIN's job is to gate the *first* redemption; from then on, the
+    // redeeming account's own auth (requireAuth + requireRole) is what
+    // gates further access, same as an ordinary grant.
     return buildRedeemBundle(patient, toGrantDto(grant));
   }
 
+  // REQ-GRANT-012: the printed card's long token lifetime is offset by
+  // requiring the *patient's* PIN (not the redeemer's) on this first real
+  // redemption - same defensive pattern as auth/service.ts's loginWithPin
+  // (constant-time-ish via DUMMY_PIN_HASH, a lockout keyed by the patient's
+  // phone, reusing the same Redis-backed counters PIN login already uses).
+  if (grant.printed) {
+    if (!input.pin) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'PIN is required to redeem this grant', [
+        { field: 'pin', message: 'required' },
+      ]);
+    }
+    const owner = await prisma.user.findUniqueOrThrow({ where: { id: patient.ownerUserId } });
+    const lockout = await checkPinLockout(owner.phone);
+    if (!lockout.allowed) {
+      throw new AppError(
+        ErrorCode.RATE_LIMITED,
+        `Too many PIN attempts, try again in ${lockout.retryAfterSec}s`,
+      );
+    }
+    const pinMatches = await verifyPin(owner.pinHash ?? DUMMY_PIN_HASH, input.pin);
+    if (!owner.pinHash || !pinMatches) {
+      await recordPinFailure(owner.phone);
+      throw new AppError(ErrorCode.UNAUTHENTICATED, 'Invalid PIN');
+    }
+    await clearPinLockout(owner.phone);
+  }
+
+  // AMBIGUITIES A4 resolved: the printed card's own token `exp` (1 year) is
+  // just how long the physical card stays scannable - the access window it
+  // grants once redeemed is the same +24h as every other grant, not a
+  // year of standing access. A long-lived *credential* is not the same
+  // thing as long-lived *access*, and only the latter needs bounding here.
   const accessUntil = new Date(Date.now() + GRANT_ACCESS_WINDOW_MS);
   const updated = await prisma.accessGrant.update({
     where: { id: grant.id },

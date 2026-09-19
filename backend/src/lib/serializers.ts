@@ -122,6 +122,10 @@ export interface GrantDto {
   accessUntil: string | null;
   revokedAt: string | null;
   createdAt: string;
+  // REQ-GRANT-012 (Tier 2): not in backend.md A.2's frozen example (predates
+  // this feature) - added so a client can tell a printed/PIN-gated grant
+  // apart from an ordinary QR one, e.g. to render it differently in a list.
+  printed: boolean;
 }
 
 export function toGrantDto(grant: AccessGrant): GrantDto {
@@ -136,6 +140,7 @@ export function toGrantDto(grant: AccessGrant): GrantDto {
     accessUntil: grant.accessUntil?.toISOString() ?? null,
     revokedAt: grant.revokedAt?.toISOString() ?? null,
     createdAt: grant.createdAt.toISOString(),
+    printed: grant.printed,
   };
 }
 
