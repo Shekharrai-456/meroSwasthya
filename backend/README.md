@@ -3,8 +3,11 @@
 Node 22/24 + TypeScript + Fastify 5 + Prisma 7 + PostgreSQL 16 + Redis. See
 `../docs/` for the full requirement ledger, architecture, data model, API
 contract, security threat table, tech decisions, and per-session progress log
-this backend is built against. `../docs/FINAL_AUDIT.md` is the authoritative,
-requirement-by-requirement status of what's actually built and verified.
+this backend is built against. `../docs/PROJECT_PLAN.md` and
+`../docs/SECURITY.md` are kept current every session and are the
+authoritative, requirement-by-requirement status of what's actually built
+and verified — `../docs/FINAL_AUDIT.md` is a one-time snapshot from Session
+6 (before most of this backend existed) and is not maintained.
 
 ## Current status
 
@@ -18,15 +21,17 @@ search, picklists, the shared rules table, feature flags), Reminders & SMS
 panel), Sync (push/pull, per-op idempotency, optimistic-concurrency
 conflicts, all 6 syncable tables including Documents metadata), and
 Documents (presigned S3 upload/download, upload-completion check,
-canRead/canAppend-gated, the Tier 2 AI document-summary worker) are all
-Tier 1 + the two specified Tier 2 backend features, built and verified.
-`npm run seed` now seeds the full demo dataset (`REQ-SEED-001/002/003`):
-4 facilities, 3 invite codes, 3 demo users (PIN 1234), Sita/Ram/Aarav with
-Ram's clinical history and Sita's week-30 pregnancy, and the 40/61/50
-codelist target. The main remaining gap is the Phase 10 hardening/
-security re-audit — see `docs/FINAL_AUDIT.md` (now a stale Session 6
-snapshot) and `docs/PROGRESS.md`'s Session 16 entry for the exact
-per-requirement breakdown.
+canRead/canAppend-gated, the Tier 2 AI document-summary worker, rate-limited
+and upload-content-verified) are all Tier 1 + the two specified Tier 2
+backend features, built and verified. `npm run seed` seeds the full demo
+dataset (`REQ-SEED-001/002/003`): 4 facilities, 3 invite codes, 3 demo users
+(PIN 1234), Sita/Ram/Aarav with Ram's clinical history and Sita's week-30
+pregnancy, and the 40/61/50 codelist target. A dedicated end-to-end smoke
+test (`test/smoke.test.ts`) walks the full demo path through the real
+login flow. The remaining known gap is `REQ-RULES-005` (the ANC clinical
+protocol table was never checked against an actual Nepal DoHS source) —
+see `docs/PROGRESS.md`'s Session 17 entry for the exact per-requirement
+breakdown.
 
 ## Prerequisites
 

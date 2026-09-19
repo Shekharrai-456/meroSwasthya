@@ -149,4 +149,105 @@ describe('config validation', () => {
       expect(result.issues.some((i) => i.startsWith('GRANT_SECRET'))).toBe(true);
     }
   });
+
+  // REQ-DOC-007: never let the app boot with AI_MODE=on but no real key -
+  // that would only surface as a confusing failure on the first real
+  // summarize call otherwise.
+  it('rejects AI_MODE=on with no ANTHROPIC_API_KEY set', () => {
+    const result = parseConfig({
+      DATABASE_URL: 'postgresql://x/y',
+      TEST_DATABASE_URL: 'postgresql://x/y_test',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_SECRET: 'a'.repeat(32),
+      GRANT_SECRET: 'b'.repeat(32),
+      S3_ENDPOINT: 'http://localhost:9000',
+      S3_PUBLIC_ENDPOINT: 'http://localhost:9000',
+      S3_BUCKET: 'bucket',
+      S3_ACCESS_KEY: 'x',
+      S3_SECRET_KEY: 'y',
+      AI_MODE: 'on',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues.some((i) => i.startsWith('ANTHROPIC_API_KEY'))).toBe(true);
+    }
+  });
+
+  it('accepts AI_MODE=on when ANTHROPIC_API_KEY is set', () => {
+    const result = parseConfig({
+      DATABASE_URL: 'postgresql://x/y',
+      TEST_DATABASE_URL: 'postgresql://x/y_test',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_SECRET: 'a'.repeat(32),
+      GRANT_SECRET: 'b'.repeat(32),
+      S3_ENDPOINT: 'http://localhost:9000',
+      S3_PUBLIC_ENDPOINT: 'http://localhost:9000',
+      S3_BUCKET: 'bucket',
+      S3_ACCESS_KEY: 'x',
+      S3_SECRET_KEY: 'y',
+      AI_MODE: 'on',
+      ANTHROPIC_API_KEY: 'sk-ant-fake-key-for-test',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  // Phase 10 hardening: docs/SECURITY.md row 10 documents `CORS_ORIGINS=*`
+  // as hackathon-only - enforced at startup for production now, not just
+  // left as a comment a deployer has to remember.
+  it('rejects CORS_ORIGINS="*" when NODE_ENV=production', () => {
+    const result = parseConfig({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://x/y',
+      TEST_DATABASE_URL: 'postgresql://x/y_test',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_SECRET: 'a'.repeat(32),
+      GRANT_SECRET: 'b'.repeat(32),
+      S3_ENDPOINT: 'http://localhost:9000',
+      S3_PUBLIC_ENDPOINT: 'http://localhost:9000',
+      S3_BUCKET: 'bucket',
+      S3_ACCESS_KEY: 'x',
+      S3_SECRET_KEY: 'y',
+      CORS_ORIGINS: '*',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.issues.some((i) => i.startsWith('CORS_ORIGINS'))).toBe(true);
+    }
+  });
+
+  it('accepts CORS_ORIGINS="*" when NODE_ENV is not production', () => {
+    const result = parseConfig({
+      NODE_ENV: 'development',
+      DATABASE_URL: 'postgresql://x/y',
+      TEST_DATABASE_URL: 'postgresql://x/y_test',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_SECRET: 'a'.repeat(32),
+      GRANT_SECRET: 'b'.repeat(32),
+      S3_ENDPOINT: 'http://localhost:9000',
+      S3_PUBLIC_ENDPOINT: 'http://localhost:9000',
+      S3_BUCKET: 'bucket',
+      S3_ACCESS_KEY: 'x',
+      S3_SECRET_KEY: 'y',
+      CORS_ORIGINS: '*',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a restricted CORS_ORIGINS list when NODE_ENV=production', () => {
+    const result = parseConfig({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://x/y',
+      TEST_DATABASE_URL: 'postgresql://x/y_test',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_SECRET: 'a'.repeat(32),
+      GRANT_SECRET: 'b'.repeat(32),
+      S3_ENDPOINT: 'http://localhost:9000',
+      S3_PUBLIC_ENDPOINT: 'http://localhost:9000',
+      S3_BUCKET: 'bucket',
+      S3_ACCESS_KEY: 'x',
+      S3_SECRET_KEY: 'y',
+      CORS_ORIGINS: 'https://app.example.com',
+    });
+    expect(result.success).toBe(true);
+  });
 });

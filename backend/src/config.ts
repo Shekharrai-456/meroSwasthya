@@ -70,6 +70,16 @@ const envSchema = z
   .refine((value) => value.AI_MODE === 'off' || !!value.ANTHROPIC_API_KEY, {
     message: 'ANTHROPIC_API_KEY is required when AI_MODE=on',
     path: ['ANTHROPIC_API_KEY'],
+  })
+  // Phase 10 hardening (SECURITY.md row 10 / docs/PROJECT_PLAN.md's "CORS
+  // tightening follow-up"): `CORS_ORIGINS=*` is explicitly documented as
+  // hackathon-only. Previously this was only a comment a deployer had to
+  // remember to act on; now a production boot with the wildcard still set
+  // fails loudly at startup, the same "don't let the app boot on an
+  // invalid config" pattern as the two refinements above.
+  .refine((value) => value.NODE_ENV !== 'production' || value.CORS_ORIGINS !== '*', {
+    message: 'CORS_ORIGINS must not be "*" when NODE_ENV=production',
+    path: ['CORS_ORIGINS'],
   });
 
 export type AppConfig = z.infer<typeof envSchema> & {

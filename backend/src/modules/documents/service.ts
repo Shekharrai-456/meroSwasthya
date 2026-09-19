@@ -2,6 +2,7 @@ import { AuditAction } from '../../../generated/prisma/enums.js';
 import { config } from '../../config.js';
 import { AppError, ErrorCode } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { checkFixedWindowLimit } from '../../lib/rateLimiter.js';
 import { type DocumentDto, toDocumentDto } from '../../lib/serializers.js';
 import {
   type AuthenticatedUser,
@@ -11,8 +12,46 @@ import {
 } from '../../plugins/auth.js';
 import { logAudit } from '../audit/service.js';
 import { enqueueAiSummaryJob } from './ai/worker.js';
-import type { DocumentMetadataUpdateInput, DocumentPresignInput } from './schemas.js';
+import {
+  MAX_SIZE_BYTES,
+  type DocumentMetadataUpdateInput,
+  type DocumentPresignInput,
+} from './schemas.js';
 import { buildObjectKey, type DocumentStorage, s3Storage } from './storage.js';
+
+// REQ-DOC-004/SECURITY.md row 15 (Phase 10 hardening). JPEG's SOI (Start Of
+// Image) marker - every valid JPEG file's first 3 bytes, regardless of
+// which APPn segment follows. This app only ever accepts `image/jpeg`
+// (Question 3), so a single fixed signature is enough here - no need for a
+// general-purpose file-type sniffing library for one format.
+const JPEG_MAGIC_BYTES = [0xff, 0xd8, 0xff];
+
+function looksLikeJpeg(buffer: Buffer): boolean {
+  return JPEG_MAGIC_BYTES.every((byte, index) => buffer[index] === byte);
+}
+
+// Phase 10 hardening (SECURITY.md row 11 / backend.md's own GAP G4): neither
+// endpoint was rate-limited at all before this - a malicious or buggy client
+// could generate unlimited presigned upload URLs or trigger unlimited real
+// S3 HEAD+GET calls per user. Keyed per-actor (like grants/service.ts's
+// `grant-create:${patientId}` limiter), not per-IP, using the same
+// Redis-backed fixed-window counter every other business-rule rate limit in
+// this codebase uses (REQ-SEC-001) - `@fastify/rate-limit`'s per-route
+// config (plugins/ratelimit.ts) only ever sees the request before the
+// authenticated actor is known.
+const DOCUMENT_PRESIGN_LIMIT = 30;
+const DOCUMENT_COMPLETE_LIMIT = 30;
+const DOCUMENT_RATE_WINDOW_SEC = 3600;
+
+async function assertUnderRateLimit(key: string, limit: number): Promise<void> {
+  const result = await checkFixedWindowLimit(key, limit, DOCUMENT_RATE_WINDOW_SEC);
+  if (!result.allowed) {
+    throw new AppError(
+      ErrorCode.RATE_LIMITED,
+      `Too many requests, try again in ${result.retryAfterSec}s`,
+    );
+  }
+}
 
 async function findPatientOrThrow(patientId: string) {
   const patient = await prisma.patient.findFirst({ where: { id: patientId, deleted: false } });
@@ -49,6 +88,7 @@ export async function presignDocument(
 }> {
   const patient = await findPatientOrThrow(input.patientId);
   await assertCanAppendPatient(actor, patient.id);
+  await assertUnderRateLimit(`document-presign:${actor.id}`, DOCUMENT_PRESIGN_LIMIT);
 
   const existing = await prisma.document.findUnique({ where: { id: input.id } });
   const objectKey = buildObjectKey(input.patientId, input.id);
@@ -65,6 +105,7 @@ export async function presignDocument(
         takenAt: new Date(input.takenAt),
         objectKey,
         contentType: input.contentType,
+        declaredSizeBytes: input.sizeBytes,
       },
     });
   } else if (document.patientId !== input.patientId) {
@@ -85,6 +126,16 @@ export async function presignDocument(
 // REQ-DOC-004: HEAD the object; only then flip status -> uploaded and audit.
 // A client that calls /complete before the PUT actually finished gets a
 // clean, actionable rejection instead of a false "uploaded" status.
+//
+// Phase 10 hardening (SECURITY.md row 15): a presigned PUT URL only pins
+// the *declared* `Content-Type` header the client sends - S3-compatible
+// storage never itself verifies that the bytes actually match it, so a
+// client could presign as `image/jpeg` and then upload anything. Two
+// checks close that gap here, both against the real object already in
+// storage, never trusting client-supplied metadata alone: the real
+// `Content-Length` must not exceed what was declared at presign time (nor
+// the absolute cap, independent of a possibly-lying declaration), and the
+// object's actual first bytes must be a real JPEG signature.
 export async function completeDocument(
   actor: AuthenticatedUser,
   documentId: string,
@@ -92,11 +143,28 @@ export async function completeDocument(
 ): Promise<DocumentDto> {
   const document = await findDocumentOrThrow(documentId);
   await assertCanAppendPatient(actor, document.patientId);
+  await assertUnderRateLimit(`document-complete:${actor.id}`, DOCUMENT_COMPLETE_LIMIT);
 
   const head = await storage.headObject(document.objectKey);
   if (!head.exists) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Upload has not completed yet', [
       { field: 'id', message: 'object not found in storage' },
+    ]);
+  }
+  if (
+    head.contentLength === null ||
+    head.contentLength > document.declaredSizeBytes ||
+    head.contentLength > MAX_SIZE_BYTES
+  ) {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, 'Uploaded object size does not match', [
+      { field: 'id', message: 'uploaded object is larger than declared at presign time' },
+    ]);
+  }
+
+  const { buffer } = await storage.downloadObject(document.objectKey);
+  if (!looksLikeJpeg(buffer)) {
+    throw new AppError(ErrorCode.VALIDATION_ERROR, 'Uploaded object is not a valid JPEG image', [
+      { field: 'id', message: 'file signature does not match image/jpeg' },
     ]);
   }
 

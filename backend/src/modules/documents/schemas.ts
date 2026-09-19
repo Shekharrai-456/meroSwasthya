@@ -6,7 +6,10 @@ const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYY
 // (docs/OPEN_QUESTIONS.md), not the PNG-inclusive list backend.md's literal
 // text names, since the object key is hard-coded `.jpg` regardless and the
 // frontend's only documented capture path already compresses to JPEG.
-const MAX_SIZE_BYTES = 2 * 1024 * 1024;
+// REQ-DOC-004/SECURITY.md row 15: exported so completeDocument can re-check
+// the real uploaded object's Content-Length against this same absolute
+// cap, not just the client-declared sizeBytes at presign time.
+export const MAX_SIZE_BYTES = 2 * 1024 * 1024;
 
 export const documentPresignSchema = z.object({
   id: z.uuid(),

@@ -18,6 +18,8 @@ This document is the **conventions** layer; per-endpoint request/response detail
 
 Endpoints marked "Auth: none" need no header. Grant tokens are never accepted where an access token is expected and vice versa (REQ-GRANT-008/REQ-ROLE-008) — the auth plugin checks `typ` before anything else.
 
+**Frontend integration note, found while writing the Phase 10 smoke test (`test/smoke.test.ts`):** `role`/`fid` are baked into the access token's JWT claims at issue time and never re-checked against the database on later requests (`requireAuth` trusts the token, doesn't re-fetch the user) — this is correct, deliberate stateless-JWT behaviour, not a bug, but it has a real consequence: **an access token obtained *before* `POST /auth/provider/activate` still carries the old role after activation succeeds.** The client must call `POST /auth/refresh` (which does re-fetch the user's current role from the database) immediately after a successful activation to get a token that actually unlocks provider/fchv-only endpoints — otherwise every following request 403s despite the activation response itself showing the new role. Confirmed by the smoke test failing at exactly this step before the refresh call was added.
+
 **Question 2 resolution (PIN reset):** `POST /auth/pin/set` accepts a `tempToken` regardless of whether the user already has a `pinHash`; if one exists, it is overwritten. This makes `pin/set` do double duty as both "first PIN" and "forgot PIN reset," gated purely by holding a fresh `tempToken` (i.e. a fresh OTP verification) — no separate `/auth/pin/reset` endpoint is added.
 
 ## 3. Success and error envelopes

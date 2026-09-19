@@ -31,13 +31,19 @@ import { resetDb, resetRedis } from './helpers/db.js';
 // a fake DocumentStorage, the same precedent reminders.test.ts established
 // for SmsAdapter.
 
+// A real JPEG SOI marker (0xFF 0xD8 0xFF) followed by arbitrary bytes -
+// `completeDocument`'s magic-byte check (Phase 10 hardening) only looks at
+// these first 3 bytes, so this is enough to look like a real JPEG without
+// needing an actual image fixture.
+const FAKE_JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+
 function fakeStorage(overrides: Partial<DocumentStorage> = {}): DocumentStorage {
   return {
     presignUpload: async (key) => `https://fake-s3.test/${key}?upload=1`,
     presignDownload: async (key) => `https://fake-s3.test/${key}?download=1`,
-    headObject: async () => ({ exists: true, contentLength: 12345 }),
+    headObject: async () => ({ exists: true, contentLength: FAKE_JPEG_BYTES.length }),
     downloadObject: async () => ({
-      buffer: Buffer.from('fake-jpeg-bytes'),
+      buffer: FAKE_JPEG_BYTES,
       contentType: 'image/jpeg',
     }),
     ...overrides,
@@ -143,6 +149,26 @@ describe('documents module', () => {
       expect(res.statusCode).toBe(403);
     });
 
+    // Phase 10 hardening (SECURITY.md row 11 / backend.md's GAP G4): this
+    // route had no rate limit at all before this session.
+    it('429 RATE_LIMITED on the 31st presign for the same user within an hour', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post('/api/v1/patients', samplePatientPayload());
+      const patientId = patientRes.json().data.patient.id;
+      for (let i = 0; i < 30; i++) {
+        const res = await owner.post(
+          '/api/v1/documents/presign',
+          samplePresignBody(patientId, { id: randomUUID() }),
+        );
+        expect(res.statusCode).toBe(200);
+      }
+      const res = await owner.post(
+        '/api/v1/documents/presign',
+        samplePresignBody(patientId, { id: randomUUID() }),
+      );
+      expect(res.statusCode).toBe(429);
+    });
+
     it('presigns an upload and creates a pending_upload document', async () => {
       const owner = await asUser(app, Role.patient);
       const patientRes = await owner.post('/api/v1/patients', samplePatientPayload());
@@ -208,6 +234,25 @@ describe('documents module', () => {
       expect(res.statusCode).toBe(401);
     });
 
+    it('429 RATE_LIMITED on the 31st complete call for the same user within an hour', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post('/api/v1/patients', samplePatientPayload());
+      const patientId = patientRes.json().data.patient.id;
+      const presignRes = await owner.post(
+        '/api/v1/documents/presign',
+        samplePresignBody(patientId),
+      );
+      const documentId = presignRes.json().data.document.id;
+      // Each call 400s (no live S3 to confirm the upload against), but the
+      // rate limit is checked before that HEAD call, so it still counts.
+      for (let i = 0; i < 30; i++) {
+        const res = await owner.post(`/api/v1/documents/${documentId}/complete`);
+        expect(res.statusCode).toBe(400);
+      }
+      const res = await owner.post(`/api/v1/documents/${documentId}/complete`);
+      expect(res.statusCode).toBe(429);
+    });
+
     it('404s for an unknown document id', async () => {
       const owner = await asUser(app, Role.patient);
       const res = await owner.post(`/api/v1/documents/${randomUUID()}/complete`);
@@ -240,6 +285,51 @@ describe('documents module', () => {
       const res = await owner.post(`/api/v1/documents/${documentId}/complete`);
       expect(res.statusCode).toBe(400);
       expect(res.json().error.code).toBe('VALIDATION_ERROR');
+    });
+
+    // Phase 10 hardening (SECURITY.md row 15): a presigned URL's
+    // Content-Type header is only ever a client declaration - storage
+    // itself never enforces it, so completeDocument re-checks the real
+    // uploaded bytes/size directly.
+    it('rejects an uploaded object whose real bytes are not a JPEG', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post('/api/v1/patients', samplePatientPayload());
+      const patientId = patientRes.json().data.patient.id;
+      const presignRes = await owner.post(
+        '/api/v1/documents/presign',
+        samplePresignBody(patientId),
+      );
+      const documentId = presignRes.json().data.document.id;
+      const actor = { id: owner.user.id, role: owner.user.role, facilityId: owner.user.facilityId };
+
+      const notAJpeg = fakeStorage({
+        downloadObject: async () => ({
+          buffer: Buffer.from('%PDF-1.4 not actually a jpeg'),
+          contentType: 'image/jpeg',
+        }),
+      });
+      await expect(completeDocument(actor, documentId, notAJpeg)).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+      });
+    });
+
+    it('rejects an uploaded object larger than the declared sizeBytes', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post('/api/v1/patients', samplePatientPayload());
+      const patientId = patientRes.json().data.patient.id;
+      const presignRes = await owner.post(
+        '/api/v1/documents/presign',
+        samplePresignBody(patientId, { sizeBytes: 1000 }),
+      );
+      const documentId = presignRes.json().data.document.id;
+      const actor = { id: owner.user.id, role: owner.user.role, facilityId: owner.user.facilityId };
+
+      const oversized = fakeStorage({
+        headObject: async () => ({ exists: true, contentLength: 2000 }),
+      });
+      await expect(completeDocument(actor, documentId, oversized)).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+      });
     });
 
     it('flips status to uploaded, bumps version, and audits document_added (fake storage)', async () => {

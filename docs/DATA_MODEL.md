@@ -152,6 +152,7 @@ Indexes: `@@index([patientId, visitAt])` — timeline + list-visits ordering (RE
 | status | DocStatus | default `pending_upload` |
 | objectKey | string | `patients/{patientId}/{documentId}.jpg` — **Question 3, resolved A**: extension is always `.jpg` because only `image/jpeg` is accepted |
 | contentType | string | always `"image/jpeg"` per Question 3 |
+| declaredSizeBytes | int | default `0` (backfill sentinel for rows predating this field, Session 16) — the client-declared `sizeBytes` at presign time, persisted so `completeDocument` can verify the real uploaded object's `Content-Length` against it (`docs/SECURITY.md` row 15) |
 | aiSummary | string? | |
 | aiSummaryStatus | AiStatus | default `none` |
 | version | int | default 1 |
@@ -160,7 +161,7 @@ Indexes: `@@index([patientId, visitAt])` — timeline + list-visits ordering (RE
 
 Indexes: `@@index([patientId])`, `@@index([updatedAt])` (sync cursor).
 
-**Check constraint (raw SQL added to the migration, since Prisma's schema DSL has no `CHECK` clause):** none required — `sizeBytes ≤ 2 MB` (REQ-DOC-001) is enforced at the presign request boundary (zod), not stored on the row, so there is nothing to constrain in the table itself.
+**Check constraint (raw SQL added to the migration, since Prisma's schema DSL has no `CHECK` clause):** none required — `sizeBytes ≤ 2 MB` (REQ-DOC-001) is enforced at the presign request boundary (zod), not stored on the row, so there is nothing to constrain in the table itself. The real uploaded object's size and content are instead verified at `complete` time against the stored `declaredSizeBytes` (Session 16, `docs/SECURITY.md` row 15) - application-level, not a database constraint, since it requires a live call to storage.
 
 ### Pregnancy (REQ-PREG-*)
 | Field | Type | Constraint |

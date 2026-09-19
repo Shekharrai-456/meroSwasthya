@@ -496,6 +496,13 @@ model Document {
   status           DocStatus @default(pending_upload)
   objectKey        String    @map("object_key")
   contentType      String    @map("content_type")
+  // Phase 10 hardening (SECURITY.md row 15): the client-declared size at
+  // presign time, kept so `completeDocument` can verify the real uploaded
+  // object's Content-Length against it, not just trust the header.
+  // `@default(0)` exists only to satisfy this migration against
+  // already-existing rows (dev/demo data predating this field) -
+  // `presignDocument` always sets a real value on every new document.
+  declaredSizeBytes Int      @default(0) @map("declared_size_bytes")
   aiSummary        String?   @map("ai_summary")
   aiSummaryStatus  AiStatus  @default(none) @map("ai_summary_status")
   version          Int       @default(1)
