@@ -195,6 +195,48 @@ describe('grants module', () => {
       expect(body.grant.accessUntil).not.toBeNull();
     });
 
+    // REQ-GRANT-007: full offline bundle - summary, timeline, active
+    // pregnancy, and all its ANC contacts, reusing the same builders as
+    // GET /patients/:id and GET /patients/:id/timeline.
+    it('bundle includes summary, timeline, active pregnancy, and its anc contacts', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+
+      const pregRes = await owner.post(`/api/v1/patients/${patient.id}/pregnancies`, {
+        id: randomUUID(),
+        lmp: '2026-02-20',
+        gravida: 1,
+        para: 0,
+        riskFactors: [],
+      });
+      const { pregnancy, ancContacts } = pregRes.json().data;
+
+      const { qrPayload } = await issueGrant(owner, patient.id);
+      const res = await provider.post('/api/v1/grants/redeem', { qrPayload });
+      const body = res.json().data;
+
+      expect(body.summary.activePregnancy.id).toBe(pregnancy.id);
+      expect(body.pregnancy.id).toBe(pregnancy.id);
+      expect(body.ancContacts).toHaveLength(ancContacts.length);
+      expect(
+        body.timeline.some((item: { kind: string }) => item.kind === 'pregnancy_registered'),
+      ).toBe(true);
+    });
+
+    it('bundle has an empty ancContacts array and null pregnancy when there is no active pregnancy', async () => {
+      const owner = await asUser(app, Role.patient);
+      const provider = await asUser(app, Role.provider);
+      const patient = await createPatientAs(owner);
+      const { qrPayload } = await issueGrant(owner, patient.id);
+
+      const res = await provider.post('/api/v1/grants/redeem', { qrPayload });
+      const body = res.json().data;
+      expect(body.pregnancy).toBeNull();
+      expect(body.ancContacts).toEqual([]);
+      expect(body.summary.visitCount).toBe(0);
+    });
+
     it('grants real access: a redeemed grant lets the provider read the patient (integration with Session 4)', async () => {
       const owner = await asUser(app, Role.patient);
       const provider = await asUser(app, Role.provider);

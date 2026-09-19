@@ -56,3 +56,93 @@ export const auditEntryDtoSchema = z.object({
 export const auditListResponseSchema = z.object({
   items: z.array(auditEntryDtoSchema),
 });
+
+// Documentation-only shapes for the summary/timeline blocks
+// (REQ-PATIENT-005..009). Small entity shapes (Pregnancy, AncContact) are
+// duplicated here rather than imported from maternal/docSchemas.ts, same
+// self-contained-per-module discipline as every other module's docSchemas.ts
+// (patientDtoSchema itself is already duplicated in grants/docSchemas.ts).
+
+const ancContactDtoSchema = z.object({
+  id: z.string(),
+  pregnancyId: z.string(),
+  contactNo: z.number(),
+  weekTarget: z.number(),
+  dueAt: z.string(),
+  doneAt: z.string().nullable(),
+  providerUserId: z.string().nullable(),
+  findings: z.record(z.string(), z.unknown()).nullable(),
+  dangerSigns: z.array(z.string()),
+  triageLevel: z.enum(['green', 'amber', 'red']).nullable(),
+  triageReasons: z.array(z.string()),
+  referral: z.record(z.string(), z.unknown()).nullable(),
+  version: z.number(),
+  updatedAt: z.string(),
+  deleted: z.boolean(),
+});
+
+const pregnancyDtoSchema = z.object({
+  id: z.string(),
+  patientId: z.string(),
+  lmp: z.string().nullable(),
+  edd: z.string(),
+  gravida: z.number(),
+  para: z.number(),
+  riskFactors: z.array(z.string()),
+  riskLevel: z.enum(['normal', 'high']),
+  status: z.enum(['active', 'delivered', 'ended']),
+  birthPlan: z.record(z.string(), z.unknown()).nullable(),
+  registeredByUserId: z.string(),
+  gestationalAgeDays: z.number(),
+  nextContact: ancContactDtoSchema.nullable(),
+  version: z.number(),
+  updatedAt: z.string(),
+  deleted: z.boolean(),
+});
+
+const prescriptionDtoSchema = z.object({
+  id: z.string(),
+  drugCode: z.string(),
+  drugName: z.string(),
+  dose: z.string(),
+  frequency: z.enum(['OD', 'BD', 'TDS', 'QID', 'SOS', 'HS']),
+  durationDays: z.number(),
+  instructionsNp: z.string().nullable(),
+});
+
+const activeProblemDtoSchema = z.object({
+  code: z.string(),
+  labelEn: z.string(),
+  labelNp: z.string(),
+  since: z.string().nullable(),
+});
+
+const patientSummaryDtoSchema = z.object({
+  activeProblems: z.array(activeProblemDtoSchema),
+  currentMedicines: z.array(prescriptionDtoSchema),
+  allergies: z.array(z.string()),
+  lastVitals: z.record(z.string(), z.unknown()).nullable(),
+  activePregnancy: pregnancyDtoSchema.nullable(),
+  lastVisitAt: z.string().nullable(),
+  visitCount: z.number(),
+});
+
+export const patientDetailResponseSchema = z.object({
+  patient: patientDtoSchema,
+  summary: patientSummaryDtoSchema,
+});
+
+const timelineItemDtoSchema = z.object({
+  kind: z.enum(['visit', 'document', 'pregnancy_registered', 'anc_contact', 'delivery']),
+  at: z.string(),
+  title: z.string(),
+  subtitle: z.string().nullable(),
+  badge: z.enum(['green', 'amber', 'red']).nullable(),
+  refId: z.string(),
+  payload: z.unknown(),
+});
+
+export const timelineResponseSchema = z.object({
+  items: z.array(timelineItemDtoSchema),
+  nextBefore: z.string().nullable(),
+});

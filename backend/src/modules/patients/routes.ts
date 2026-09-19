@@ -4,10 +4,12 @@ import { docSchema, noopSerializerCompiler, noopValidatorCompiler } from '../../
 import { assertCanReadPatient, getAuthenticatedUser, requireAuth } from '../../plugins/auth.js';
 import {
   auditListResponseSchema,
+  patientDetailResponseSchema,
   patientListResponseSchema,
   patientWrapperResponseSchema,
+  timelineResponseSchema,
 } from './docSchemas.js';
-import { patientCreateSchema, patientUpdateSchema } from './schemas.js';
+import { patientCreateSchema, patientUpdateSchema, timelineQuerySchema } from './schemas.js';
 import * as patientsService from './service.js';
 
 const patientIdParamsSchema = z.object({ id: z.uuid() });
@@ -65,11 +67,10 @@ export async function patientsRoutes(app: FastifyInstance): Promise<void> {
       validatorCompiler: noopValidatorCompiler,
       serializerCompiler: noopSerializerCompiler,
       schema: docSchema({
-        summary: 'Get a single patient',
-        description:
-          'REQ-PATIENT-004. canRead-gated (REQ-ROLE-003). Patient entity only - no summary block yet, see docs/PROGRESS.md Session 4 entry.',
+        summary: 'Get a single patient with its computed summary',
+        description: 'REQ-PATIENT-004..007. canRead-gated (REQ-ROLE-003).',
         tags: ['patients'],
-        response200: patientWrapperResponseSchema,
+        response200: patientDetailResponseSchema,
       }),
     },
     async (request, reply) => {
@@ -81,9 +82,34 @@ export async function patientsRoutes(app: FastifyInstance): Promise<void> {
       // report FORBIDDEN for ids that were never real, which is wrong, not
       // just differently-worded (found as a real test failure, not by
       // inspection - see docs/PROGRESS.md's Session 4 entry).
-      const patient = await patientsService.getPatient(id);
+      const { patient, summary } = await patientsService.getPatient(id);
       await assertCanReadPatient(actor, id);
-      return reply.ok({ patient });
+      return reply.ok({ patient, summary });
+    },
+  );
+
+  app.get(
+    '/patients/:id/timeline',
+    {
+      preHandler: requireAuth,
+      validatorCompiler: noopValidatorCompiler,
+      serializerCompiler: noopSerializerCompiler,
+      schema: docSchema({
+        summary: 'Unified chronological feed for a patient',
+        description:
+          'REQ-PATIENT-008/009. canRead-gated. Unions visits, documents, pregnancy-registered, done ANC contacts, and deliveries; cursor-paginated on `before`, limit 50.',
+        tags: ['patients'],
+        response200: timelineResponseSchema,
+      }),
+    },
+    async (request, reply) => {
+      const { id } = patientIdParamsSchema.parse(request.params);
+      const query = timelineQuerySchema.parse(request.query);
+      const actor = getAuthenticatedUser(request);
+      // Same 404-before-403 ordering as GET /patients/:id above.
+      const result = await patientsService.getPatientTimeline(id, query);
+      await assertCanReadPatient(actor, id);
+      return reply.ok(result);
     },
   );
 

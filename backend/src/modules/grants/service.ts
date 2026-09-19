@@ -1,13 +1,24 @@
 import { randomUUID } from 'node:crypto';
+import type { Patient } from '../../../generated/prisma/client.js';
 import { AuditAction } from '../../../generated/prisma/enums.js';
 import { config } from '../../config.js';
 import { AppError, ErrorCode } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { checkFixedWindowLimit } from '../../lib/rateLimiter.js';
-import { type GrantDto, type PatientDto, toGrantDto, toPatientDto } from '../../lib/serializers.js';
+import {
+  type AncContactDto,
+  type GrantDto,
+  type PatientDto,
+  type PregnancyDto,
+  toAncContactDto,
+  toGrantDto,
+  toPatientDto,
+} from '../../lib/serializers.js';
 import { signGrantToken, verifyGrantToken } from '../../lib/tokens.js';
 import { type AuthenticatedUser, getActorAuditInfo } from '../../plugins/auth.js';
 import { logAudit } from '../audit/service.js';
+import { type PatientSummary, buildPatientSummary } from '../patients/summary.js';
+import { type TimelineItemDto, buildPatientTimeline } from '../patients/timeline.js';
 import type { GrantCreateInput, GrantRedeemInput } from './schemas.js';
 
 // REQ-GRANT-001: 20 per patient per hour, independent of who is creating them
@@ -89,12 +100,44 @@ export async function createGrant(
 export interface RedeemGrantResult {
   grant: GrantDto;
   patient: PatientDto;
+  summary: PatientSummary;
+  timeline: TimelineItemDto[];
+  pregnancy: PregnancyDto | null;
+  ancContacts: AncContactDto[];
 }
 
-// REQ-GRANT-003..007. Redeem bundle ships as {grant, patient} only -
-// `summary`/`timeline`/`pregnancy`/`ancContacts` all depend on Visit/
-// Pregnancy/AncContact tables that don't exist until Phase 5/7, same
-// reasoning as GET /patients/:id in Session 4. Not faked here either.
+// REQ-GRANT-007: "same summary object as GET /patients/:id", latest-50
+// timeline, active pregnancy, and all its ANC contacts - reuses
+// patients/summary.ts and patients/timeline.ts rather than re-deriving this
+// read model a second way (same "one implementation, reused everywhere"
+// principle as Sync's dispatcher, docs/PROGRESS.md's Session 12 entry).
+// `ancContacts` is all contacts for the *active* pregnancy specifically
+// (backend.md §9.2's bundle lists `pregnancy` and `ancContacts` as
+// siblings) - empty when there is none.
+async function buildRedeemBundle(patient: Patient, grant: GrantDto): Promise<RedeemGrantResult> {
+  const summary = await buildPatientSummary(patient);
+  const { items: timeline } = await buildPatientTimeline(patient.id, null, 50);
+  const ancContacts = summary.activePregnancy
+    ? (
+        await prisma.ancContact.findMany({
+          where: { pregnancyId: summary.activePregnancy.id, deleted: false },
+          orderBy: { contactNo: 'asc' },
+        })
+      ).map(toAncContactDto)
+    : [];
+
+  return {
+    grant,
+    patient: toPatientDto(patient),
+    summary,
+    timeline,
+    pregnancy: summary.activePregnancy,
+    ancContacts,
+  };
+}
+
+// REQ-GRANT-003..007. Returns the full offline bundle a provider app caches
+// after scanning a QR code.
 export async function redeemGrant(
   actor: AuthenticatedUser,
   input: GrantRedeemInput,
@@ -128,7 +171,7 @@ export async function redeemGrant(
     // Idempotent re-redeem: return the bundle again, no new audit row, no
     // accessUntil extension (a repeated scan shouldn't silently prolong
     // access past the original 24h window).
-    return { grant: toGrantDto(grant), patient: toPatientDto(patient) };
+    return buildRedeemBundle(patient, toGrantDto(grant));
   }
 
   const accessUntil = new Date(Date.now() + GRANT_ACCESS_WINDOW_MS);
@@ -145,7 +188,7 @@ export async function redeemGrant(
     grantId: grant.id,
   });
 
-  return { grant: toGrantDto(updated), patient: toPatientDto(patient) };
+  return buildRedeemBundle(patient, toGrantDto(updated));
 }
 
 // REQ-GRANT-008: owner-only, ends access immediately (canReadPatient/

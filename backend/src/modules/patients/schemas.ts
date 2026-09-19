@@ -43,3 +43,12 @@ export const patientUpdateSchema = z.object({
   emergencyContactPhone: phoneSchema.nullable().optional(),
 });
 export type PatientUpdateInput = z.infer<typeof patientUpdateSchema>;
+
+// REQ-PATIENT-008: "limit 50" is backend.md §9.1.2's literal cap - unlike
+// Visits' `limit` (default 50, capped at 200), the timeline has no
+// documented larger page size to allow.
+export const timelineQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(50).optional().default(50),
+  before: z.string().optional(),
+});
+export type TimelineQuery = z.infer<typeof timelineQuerySchema>;

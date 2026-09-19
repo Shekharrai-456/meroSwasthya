@@ -33,6 +33,36 @@ function samplePatientBody(overrides: Record<string, unknown> = {}) {
   };
 }
 
+async function seedCodes(): Promise<void> {
+  await prisma.codeListItem.createMany({
+    data: [
+      { kind: 'complaint', code: 'CC_FEVER', labelEn: 'Fever', labelNp: 'ज्वरो' },
+      { kind: 'diagnosis', code: 'E11', labelEn: 'Type 2 diabetes', labelNp: 'मधुमेह' },
+      { kind: 'diagnosis', code: 'J45', labelEn: 'Asthma', labelNp: 'दम' },
+      {
+        kind: 'drug',
+        code: 'PARACETAMOL_500',
+        labelEn: 'Paracetamol 500 mg',
+        labelNp: 'प्यारासिटामोल',
+      },
+      { kind: 'drug', code: 'AMOX_500', labelEn: 'Amoxicillin 500 mg', labelNp: 'एमोक्सिसिलिन' },
+    ],
+    skipDuplicates: true,
+  });
+}
+
+function sampleVisitBody(overrides: Record<string, unknown> = {}) {
+  return {
+    id: randomUUID(),
+    visitAt: '2026-09-18T04:05:00.000Z',
+    chiefComplaintCode: 'CC_FEVER',
+    vitals: {},
+    diagnosisCodes: [],
+    prescriptions: [],
+    ...overrides,
+  };
+}
+
 async function createGrant(
   patientId: string,
   redeemedByUserId: string,
@@ -409,6 +439,279 @@ describe('patients module', () => {
 
       const entries = await prisma.auditEntry.findMany({ where: { action: 'record_viewed' } });
       expect(entries).toHaveLength(0);
+    });
+  });
+
+  describe('GET /api/v1/patients/:id summary block (REQ-PATIENT-005..007)', () => {
+    it('is all-empty defaults for a patient with no visits/pregnancy', async () => {
+      const owner = await asUser(app, Role.patient);
+      const created = await owner.post(
+        '/api/v1/patients',
+        samplePatientBody({ allergies: ['penicillin'] }),
+      );
+      const patientId = created.json().data.patient.id;
+
+      const res = await owner.get(`/api/v1/patients/${patientId}`);
+      const { summary } = res.json().data;
+      expect(summary.activeProblems).toEqual([]);
+      expect(summary.currentMedicines).toEqual([]);
+      expect(summary.allergies).toEqual(['penicillin']);
+      expect(summary.lastVitals).toBeNull();
+      expect(summary.activePregnancy).toBeNull();
+      expect(summary.lastVisitAt).toBeNull();
+      expect(summary.visitCount).toBe(0);
+    });
+
+    it('activeProblems: distinct diagnosis codes + chronicConditions, labelled, since = earliest visit', async () => {
+      await seedCodes();
+      const owner = await asUser(app, Role.patient);
+      const created = await owner.post(
+        '/api/v1/patients',
+        samplePatientBody({ chronicConditions: ['J45'] }),
+      );
+      const patientId = created.json().data.patient.id;
+
+      await owner.post(
+        `/api/v1/patients/${patientId}/visits`,
+        sampleVisitBody({ visitAt: '2026-01-01T04:00:00.000Z', diagnosisCodes: ['E11'] }),
+      );
+      await owner.post(
+        `/api/v1/patients/${patientId}/visits`,
+        sampleVisitBody({
+          id: randomUUID(),
+          visitAt: '2026-06-01T04:00:00.000Z',
+          diagnosisCodes: ['E11'],
+        }),
+      );
+
+      const res = await owner.get(`/api/v1/patients/${patientId}`);
+      const problems: { code: string; labelEn: string; since: string | null }[] =
+        res.json().data.summary.activeProblems;
+      const e11 = problems.find((p) => p.code === 'E11');
+      const j45 = problems.find((p) => p.code === 'J45');
+      expect(e11?.labelEn).toBe('Type 2 diabetes');
+      expect(e11?.since).toBe('2026-01-01'); // earliest of the two visits
+      expect(j45?.labelEn).toBe('Asthma');
+      expect(j45?.since).toBeNull(); // no visit carries this code
+    });
+
+    it('currentMedicines: excludes an expired prescription, dedupes by drugCode keeping the newest visit', async () => {
+      await seedCodes();
+      const owner = await asUser(app, Role.patient);
+      const created = await owner.post('/api/v1/patients', samplePatientBody());
+      const patientId = created.json().data.patient.id;
+
+      const farPast = new Date(Date.now() - 400 * 86_400_000).toISOString();
+      const recent = new Date(Date.now() - 1 * 86_400_000).toISOString();
+      const older = new Date(Date.now() - 5 * 86_400_000).toISOString();
+
+      // Expired: visitAt (400 days ago) + 5 days is long past.
+      await owner.post(
+        `/api/v1/patients/${patientId}/visits`,
+        sampleVisitBody({
+          visitAt: farPast,
+          prescriptions: [
+            {
+              id: randomUUID(),
+              drugCode: 'AMOX_500',
+              drugName: 'Amoxicillin 500 mg',
+              dose: '1 tab',
+              frequency: 'BD',
+              durationDays: 5,
+            },
+          ],
+        }),
+      );
+      // Older still-active prescription for PARACETAMOL_500.
+      await owner.post(
+        `/api/v1/patients/${patientId}/visits`,
+        sampleVisitBody({
+          id: randomUUID(),
+          visitAt: older,
+          prescriptions: [
+            {
+              id: randomUUID(),
+              drugCode: 'PARACETAMOL_500',
+              drugName: 'Paracetamol 500 mg (old dose)',
+              dose: '1 tab',
+              frequency: 'OD',
+              durationDays: 30,
+            },
+          ],
+        }),
+      );
+      // Newest prescription for the same drug - should win the dedupe.
+      await owner.post(
+        `/api/v1/patients/${patientId}/visits`,
+        sampleVisitBody({
+          id: randomUUID(),
+          visitAt: recent,
+          prescriptions: [
+            {
+              id: randomUUID(),
+              drugCode: 'PARACETAMOL_500',
+              drugName: 'Paracetamol 500 mg (new dose)',
+              dose: '2 tab',
+              frequency: 'OD',
+              durationDays: 30,
+            },
+          ],
+        }),
+      );
+
+      const res = await owner.get(`/api/v1/patients/${patientId}`);
+      const meds: { drugCode: string; drugName: string }[] =
+        res.json().data.summary.currentMedicines;
+      expect(meds).toHaveLength(1);
+      expect(meds[0]?.drugCode).toBe('PARACETAMOL_500');
+      expect(meds[0]?.drugName).toBe('Paracetamol 500 mg (new dose)');
+    });
+
+    it('lastVitals: the latest visit that recorded any vitals, not necessarily the latest visit overall', async () => {
+      await seedCodes();
+      const owner = await asUser(app, Role.patient);
+      const created = await owner.post('/api/v1/patients', samplePatientBody());
+      const patientId = created.json().data.patient.id;
+
+      await owner.post(
+        `/api/v1/patients/${patientId}/visits`,
+        sampleVisitBody({ visitAt: '2026-06-01T04:00:00.000Z', vitals: { bpSys: 138, bpDia: 88 } }),
+      );
+      await owner.post(
+        `/api/v1/patients/${patientId}/visits`,
+        sampleVisitBody({ id: randomUUID(), visitAt: '2026-07-01T04:00:00.000Z', vitals: {} }),
+      );
+
+      const res = await owner.get(`/api/v1/patients/${patientId}`);
+      const { summary } = res.json().data;
+      expect(summary.lastVitals.bpSys).toBe(138);
+      expect(summary.lastVitals.at).toBe('2026-06-01T04:00:00.000Z');
+      expect(summary.lastVisitAt).toBe('2026-07-01T04:00:00.000Z'); // most recent visit overall
+      expect(summary.visitCount).toBe(2);
+    });
+
+    it('activePregnancy is populated when the patient has an active pregnancy', async () => {
+      const owner = await asUser(app, Role.patient);
+      const created = await owner.post('/api/v1/patients', samplePatientBody({ sex: 'female' }));
+      const patientId = created.json().data.patient.id;
+      await owner.post(`/api/v1/patients/${patientId}/pregnancies`, {
+        id: randomUUID(),
+        lmp: '2026-02-20',
+        gravida: 1,
+        para: 0,
+        riskFactors: [],
+      });
+
+      const res = await owner.get(`/api/v1/patients/${patientId}`);
+      expect(res.json().data.summary.activePregnancy).not.toBeNull();
+      expect(res.json().data.summary.activePregnancy.status).toBe('active');
+    });
+  });
+
+  describe('GET /api/v1/patients/:id/timeline (REQ-PATIENT-008/009)', () => {
+    it('requires authentication', async () => {
+      const res = await testClient(app).get(`/api/v1/patients/${randomUUID()}/timeline`);
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('404 on an unknown patient, 403 with no access', async () => {
+      const owner = await asUser(app, Role.patient);
+      const stranger = await asUser(app, Role.provider);
+      const notFound = await owner.get(`/api/v1/patients/${randomUUID()}/timeline`);
+      expect(notFound.statusCode).toBe(404);
+
+      const created = await owner.post('/api/v1/patients', samplePatientBody());
+      const forbidden = await stranger.get(
+        `/api/v1/patients/${created.json().data.patient.id}/timeline`,
+      );
+      expect(forbidden.statusCode).toBe(403);
+    });
+
+    it('unions visit, document, pregnancy_registered, and done anc_contact, sorted newest first, with correct titles/badges', async () => {
+      await seedCodes();
+      const owner = await asUser(app, Role.patient);
+      const created = await owner.post('/api/v1/patients', samplePatientBody());
+      const patientId = created.json().data.patient.id;
+
+      await owner.post(
+        `/api/v1/patients/${patientId}/visits`,
+        sampleVisitBody({
+          visitAt: '2026-01-01T04:00:00.000Z',
+          diagnosisCodes: ['E11'],
+          vitals: { bpSys: 120, bpDia: 80 },
+        }),
+      );
+      await owner.post('/api/v1/documents/presign', {
+        id: randomUUID(),
+        patientId,
+        type: 'lab',
+        title: 'Blood test',
+        takenAt: '2026-02-01',
+        contentType: 'image/jpeg',
+        sizeBytes: 500_000,
+      });
+      const pregRes = await owner.post(`/api/v1/patients/${patientId}/pregnancies`, {
+        id: randomUUID(),
+        lmp: '2026-02-20',
+        gravida: 1,
+        para: 0,
+        riskFactors: [],
+      });
+      const { pregnancy, ancContacts } = pregRes.json().data;
+      const contact1 = ancContacts.find((c: { contactNo: number }) => c.contactNo === 1);
+      await owner.put(`/api/v1/pregnancies/${pregnancy.id}/contacts/1`, {
+        doneAt: '2026-03-01T05:00:00.000Z',
+        findings: { bpSys: 150, bpDia: 95, hbGdl: 9.2, urineProtein: '++' },
+        dangerSigns: [],
+        referral: { facilityName: 'Ghorahi HP', reason: 'high BP', urgency: 'urgent' },
+      });
+
+      const res = await owner.get(`/api/v1/patients/${patientId}/timeline`);
+      const items: {
+        kind: string;
+        title: string;
+        subtitle: string | null;
+        badge: string | null;
+      }[] = res.json().data.items;
+      const kinds = items.map((i) => i.kind);
+      // pregnancy_registered's `at` is the pregnancy's updatedAt (now, at
+      // creation time) - newer than the anc_contact's doneAt (backdated to
+      // 2026-03-01 above), which in turn is newer than the document/visit.
+      expect(kinds).toEqual(['pregnancy_registered', 'anc_contact', 'document', 'visit']);
+
+      const contactItem = items.find((i) => i.kind === 'anc_contact');
+      expect(contactItem?.title).toBe('ANC contact 1 (week 12)');
+      expect(contactItem?.subtitle).toBe('BP 150/95 · Hb 9.2 · referred');
+      expect(contactItem?.badge).toBe('red');
+
+      const docItem = items.find((i) => i.kind === 'document');
+      expect(docItem?.title).toBe('Lab report: Blood test');
+
+      const visitItem = items.find((i) => i.kind === 'visit');
+      expect(visitItem?.title).toBe('Visit — Self-reported — Type 2 diabetes');
+      expect(visitItem?.subtitle).toBe('Fever · BP 120/80');
+
+      const pregItem = items.find((i) => i.kind === 'pregnancy_registered');
+      expect(pregItem?.title).toBe('Pregnancy registered');
+
+      expect(contact1.id).toBeTruthy(); // sanity: contact existed before recording
+    });
+
+    it('excludes anc_contacts that have not been done yet', async () => {
+      const owner = await asUser(app, Role.patient);
+      const created = await owner.post('/api/v1/patients', samplePatientBody());
+      const patientId = created.json().data.patient.id;
+      await owner.post(`/api/v1/patients/${patientId}/pregnancies`, {
+        id: randomUUID(),
+        lmp: '2026-02-20',
+        gravida: 1,
+        para: 0,
+        riskFactors: [],
+      });
+
+      const res = await owner.get(`/api/v1/patients/${patientId}/timeline`);
+      const kinds = res.json().data.items.map((i: { kind: string }) => i.kind);
+      expect(kinds).toEqual(['pregnancy_registered']); // 8 stub anc_contacts all excluded (doneAt null)
     });
   });
 

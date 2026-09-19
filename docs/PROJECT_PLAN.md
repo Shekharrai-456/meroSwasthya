@@ -80,12 +80,12 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-PATIENT-001 | POST /patients, idempotent create | VERIFIED | `src/modules/patients/routes.ts`, `service.ts` | `test/patients.test.ts` | |
 | REQ-PATIENT-002 | Same id, different owner → 403 | VERIFIED | `src/modules/patients/service.ts` | `test/patients.test.ts` | |
 | REQ-PATIENT-003 | PATCH, optimistic concurrency | VERIFIED | `src/modules/patients/service.ts` | `test/patients.test.ts` | |
-| REQ-PATIENT-004 | GET /patients/:id + summary | IMPLEMENTED (partial) | `src/modules/patients/routes.ts`, `service.ts` | `test/patients.test.ts` | patient entity only, no `summary` block - see REQ-PATIENT-005/006/007 |
-| REQ-PATIENT-005 | Summary.activeProblems | NOT_STARTED | — | — | needs the Visit table (Phase 5) + CodeListItem (Phase 1); deliberately not stubbed, see Session 4 PROGRESS entry |
-| REQ-PATIENT-006 | Summary.currentMedicines | NOT_STARTED | — | — | needs the Visit table (Phase 5); same reasoning as REQ-PATIENT-005 |
-| REQ-PATIENT-007 | Summary allergies/lastVitals/pregnancy/counts | NOT_STARTED | — | — | needs Visit (Phase 5) + Pregnancy (Phase 7); `allergies` alone is trivially `= patient.allergies` but the REQ ships as one unit with the rest |
-| REQ-PATIENT-008 | GET timeline, unified feed | NOT_STARTED | — | — | unions Visit/Document/Pregnancy/AncContact/Delivery - none exist until Phase 5/7/9 |
-| REQ-PATIENT-009 | Timeline item formatting per kind | NOT_STARTED | — | — | depends on REQ-PATIENT-008 |
+| REQ-PATIENT-004 | GET /patients/:id + summary | VERIFIED | `src/modules/patients/routes.ts`, `service.ts` | `test/patients.test.ts` | |
+| REQ-PATIENT-005 | Summary.activeProblems | VERIFIED | `src/modules/patients/summary.ts` | `test/patients.test.ts` | `chronicConditions` isn't codelist-validated at patient creation (unlike Visit's diagnosisCodes) - an unmatched code falls back to using the code itself as its label |
+| REQ-PATIENT-006 | Summary.currentMedicines | VERIFIED | `src/modules/patients/summary.ts` | `test/patients.test.ts` | date-only arithmetic (`addDaysToDateOnly`), not instant math, matching the codebase's existing `todayDateOnly`-string-comparison convention |
+| REQ-PATIENT-007 | Summary allergies/lastVitals/pregnancy/counts | VERIFIED | `src/modules/patients/summary.ts` | `test/patients.test.ts` | |
+| REQ-PATIENT-008 | GET timeline, unified feed | VERIFIED | `src/modules/patients/timeline.ts`, `routes.ts` | `test/patients.test.ts` | merges 5 independently-capped queries in memory rather than one SQL UNION - same tradeoff as Sync's pull and Facilities' Haversine search |
+| REQ-PATIENT-009 | Timeline item formatting per kind | VERIFIED | `src/modules/patients/timeline.ts` | `test/patients.test.ts` | `DocType` has no codelist entry - a small fixed English label map is used (server text is English, frontend localises, same convention as triage reasons) |
 | REQ-PATIENT-010 | GET audit, owner-only | VERIFIED | `src/modules/patients/routes.ts`, `service.ts`, `src/modules/audit/service.ts` | `test/patients.test.ts` | |
 | REQ-PATIENT-011 | Patient fields | VERIFIED | `prisma/schema.prisma` | `test/patients.test.ts` (exercised via every endpoint) | |
 | REQ-PATIENT-012 | Soft-delete flag + read filters | VERIFIED | every `patients/*` query (`deleted: false`) | `test/patients.test.ts` | Question 4: no write path built, filter is tested by construction (nothing sets it true) |
@@ -105,7 +105,7 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-GRANT-004 | Expired/revoked → GRANT_EXPIRED | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | A.6#15 |
 | REQ-GRANT-005 | Same-user idempotent / other-user 409 | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
 | REQ-GRANT-006 | Redeem sets accessUntil, audits | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
-| REQ-GRANT-007 | Redeem returns full offline bundle | IMPLEMENTED (partial) | `src/modules/grants/service.ts` | `test/grants.test.ts` | ships `{grant, patient}` only - `summary`/`timeline`/`pregnancy`/`ancContacts` need Visit/Pregnancy/AncContact (Phase 5/7), same reasoning as REQ-PATIENT-004..009 |
+| REQ-GRANT-007 | Redeem returns full offline bundle | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | reuses `patients/summary.ts`/`timeline.ts` rather than re-deriving the read model a second way; `ancContacts` is all contacts for the active pregnancy specifically, `[]` when there is none |
 | REQ-GRANT-008 | POST /grants/:id/revoke | VERIFIED | `src/modules/grants/routes.ts`, `service.ts` | `test/grants.test.ts` | |
 | REQ-GRANT-009 | 24h access window enforced on every call | VERIFIED | `src/plugins/auth.ts` (`canReadPatient`/`canAppendPatient`, built Session 4) | `test/grants.test.ts` | A.6#16 |
 | REQ-GRANT-012 | Printed long-lived QR + PIN redeem | NOT_STARTED | `src/modules/grants/service.ts` | `test/grants.test.ts` | Tier 2 — build only if time allows |

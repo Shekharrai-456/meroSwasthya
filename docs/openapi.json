@@ -945,11 +945,11 @@
     },
     "/patients/{id}": {
       "get": {
-        "summary": "Get a single patient",
+        "summary": "Get a single patient with its computed summary",
         "tags": [
           "patients"
         ],
-        "description": "REQ-PATIENT-004. canRead-gated (REQ-ROLE-003). Patient entity only - no summary block yet, see docs/PROGRESS.md Session 4 entry.",
+        "description": "REQ-PATIENT-004..007. canRead-gated (REQ-ROLE-003).",
         "parameters": [
           {
             "schema": {
@@ -1055,10 +1055,292 @@
                             "deleted"
                           ],
                           "additionalProperties": false
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "activeProblems": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string"
+                                  },
+                                  "labelEn": {
+                                    "type": "string"
+                                  },
+                                  "labelNp": {
+                                    "type": "string"
+                                  },
+                                  "since": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "code",
+                                  "labelEn",
+                                  "labelNp",
+                                  "since"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "currentMedicines": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "drugCode": {
+                                    "type": "string"
+                                  },
+                                  "drugName": {
+                                    "type": "string"
+                                  },
+                                  "dose": {
+                                    "type": "string"
+                                  },
+                                  "frequency": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OD",
+                                      "BD",
+                                      "TDS",
+                                      "QID",
+                                      "SOS",
+                                      "HS"
+                                    ]
+                                  },
+                                  "durationDays": {
+                                    "type": "number"
+                                  },
+                                  "instructionsNp": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "drugCode",
+                                  "drugName",
+                                  "dose",
+                                  "frequency",
+                                  "durationDays",
+                                  "instructionsNp"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "allergies": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "lastVitals": {
+                              "nullable": true,
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "activePregnancy": {
+                              "nullable": true,
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "patientId": {
+                                  "type": "string"
+                                },
+                                "lmp": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "edd": {
+                                  "type": "string"
+                                },
+                                "gravida": {
+                                  "type": "number"
+                                },
+                                "para": {
+                                  "type": "number"
+                                },
+                                "riskFactors": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "riskLevel": {
+                                  "type": "string",
+                                  "enum": [
+                                    "normal",
+                                    "high"
+                                  ]
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "active",
+                                    "delivered",
+                                    "ended"
+                                  ]
+                                },
+                                "birthPlan": {
+                                  "nullable": true,
+                                  "type": "object",
+                                  "additionalProperties": {}
+                                },
+                                "registeredByUserId": {
+                                  "type": "string"
+                                },
+                                "gestationalAgeDays": {
+                                  "type": "number"
+                                },
+                                "nextContact": {
+                                  "nullable": true,
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "pregnancyId": {
+                                      "type": "string"
+                                    },
+                                    "contactNo": {
+                                      "type": "number"
+                                    },
+                                    "weekTarget": {
+                                      "type": "number"
+                                    },
+                                    "dueAt": {
+                                      "type": "string"
+                                    },
+                                    "doneAt": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    },
+                                    "providerUserId": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    },
+                                    "findings": {
+                                      "nullable": true,
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    },
+                                    "dangerSigns": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "triageLevel": {
+                                      "nullable": true,
+                                      "type": "string",
+                                      "enum": [
+                                        "green",
+                                        "amber",
+                                        "red"
+                                      ]
+                                    },
+                                    "triageReasons": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "referral": {
+                                      "nullable": true,
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    },
+                                    "version": {
+                                      "type": "number"
+                                    },
+                                    "updatedAt": {
+                                      "type": "string"
+                                    },
+                                    "deleted": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "pregnancyId",
+                                    "contactNo",
+                                    "weekTarget",
+                                    "dueAt",
+                                    "doneAt",
+                                    "providerUserId",
+                                    "findings",
+                                    "dangerSigns",
+                                    "triageLevel",
+                                    "triageReasons",
+                                    "referral",
+                                    "version",
+                                    "updatedAt",
+                                    "deleted"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "version": {
+                                  "type": "number"
+                                },
+                                "updatedAt": {
+                                  "type": "string"
+                                },
+                                "deleted": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "patientId",
+                                "lmp",
+                                "edd",
+                                "gravida",
+                                "para",
+                                "riskFactors",
+                                "riskLevel",
+                                "status",
+                                "birthPlan",
+                                "registeredByUserId",
+                                "gestationalAgeDays",
+                                "nextContact",
+                                "version",
+                                "updatedAt",
+                                "deleted"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "lastVisitAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "visitCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "activeProblems",
+                            "currentMedicines",
+                            "allergies",
+                            "lastVitals",
+                            "activePregnancy",
+                            "lastVisitAt",
+                            "visitCount"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
-                        "patient"
+                        "patient",
+                        "summary"
                       ],
                       "additionalProperties": false
                     }
@@ -1256,6 +1538,110 @@
                       },
                       "required": [
                         "patient"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patients/{id}/timeline": {
+      "get": {
+        "summary": "Unified chronological feed for a patient",
+        "tags": [
+          "patients"
+        ],
+        "description": "REQ-PATIENT-008/009. canRead-gated. Unions visits, documents, pregnancy-registered, done ANC contacts, and deliveries; cursor-paginated on `before`, limit 50.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "visit",
+                                  "document",
+                                  "pregnancy_registered",
+                                  "anc_contact",
+                                  "delivery"
+                                ]
+                              },
+                              "at": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "subtitle": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "badge": {
+                                "nullable": true,
+                                "type": "string",
+                                "enum": [
+                                  "green",
+                                  "amber",
+                                  "red"
+                                ]
+                              },
+                              "refId": {
+                                "type": "string"
+                              },
+                              "payload": {}
+                            },
+                            "required": [
+                              "kind",
+                              "at",
+                              "title",
+                              "subtitle",
+                              "badge",
+                              "refId",
+                              "payload"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "nextBefore": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "nextBefore"
                       ],
                       "additionalProperties": false
                     }
@@ -1684,11 +2070,608 @@
                             "deleted"
                           ],
                           "additionalProperties": false
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "activeProblems": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string"
+                                  },
+                                  "labelEn": {
+                                    "type": "string"
+                                  },
+                                  "labelNp": {
+                                    "type": "string"
+                                  },
+                                  "since": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "code",
+                                  "labelEn",
+                                  "labelNp",
+                                  "since"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "currentMedicines": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "drugCode": {
+                                    "type": "string"
+                                  },
+                                  "drugName": {
+                                    "type": "string"
+                                  },
+                                  "dose": {
+                                    "type": "string"
+                                  },
+                                  "frequency": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OD",
+                                      "BD",
+                                      "TDS",
+                                      "QID",
+                                      "SOS",
+                                      "HS"
+                                    ]
+                                  },
+                                  "durationDays": {
+                                    "type": "number"
+                                  },
+                                  "instructionsNp": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "drugCode",
+                                  "drugName",
+                                  "dose",
+                                  "frequency",
+                                  "durationDays",
+                                  "instructionsNp"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "allergies": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "lastVitals": {
+                              "nullable": true,
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "activePregnancy": {
+                              "nullable": true,
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "patientId": {
+                                  "type": "string"
+                                },
+                                "lmp": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "edd": {
+                                  "type": "string"
+                                },
+                                "gravida": {
+                                  "type": "number"
+                                },
+                                "para": {
+                                  "type": "number"
+                                },
+                                "riskFactors": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "riskLevel": {
+                                  "type": "string",
+                                  "enum": [
+                                    "normal",
+                                    "high"
+                                  ]
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "active",
+                                    "delivered",
+                                    "ended"
+                                  ]
+                                },
+                                "birthPlan": {
+                                  "nullable": true,
+                                  "type": "object",
+                                  "additionalProperties": {}
+                                },
+                                "registeredByUserId": {
+                                  "type": "string"
+                                },
+                                "gestationalAgeDays": {
+                                  "type": "number"
+                                },
+                                "nextContact": {
+                                  "nullable": true,
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "pregnancyId": {
+                                      "type": "string"
+                                    },
+                                    "contactNo": {
+                                      "type": "number"
+                                    },
+                                    "weekTarget": {
+                                      "type": "number"
+                                    },
+                                    "dueAt": {
+                                      "type": "string"
+                                    },
+                                    "doneAt": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    },
+                                    "providerUserId": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    },
+                                    "findings": {
+                                      "nullable": true,
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    },
+                                    "dangerSigns": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "triageLevel": {
+                                      "nullable": true,
+                                      "type": "string",
+                                      "enum": [
+                                        "green",
+                                        "amber",
+                                        "red"
+                                      ]
+                                    },
+                                    "triageReasons": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "referral": {
+                                      "nullable": true,
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    },
+                                    "version": {
+                                      "type": "number"
+                                    },
+                                    "updatedAt": {
+                                      "type": "string"
+                                    },
+                                    "deleted": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "pregnancyId",
+                                    "contactNo",
+                                    "weekTarget",
+                                    "dueAt",
+                                    "doneAt",
+                                    "providerUserId",
+                                    "findings",
+                                    "dangerSigns",
+                                    "triageLevel",
+                                    "triageReasons",
+                                    "referral",
+                                    "version",
+                                    "updatedAt",
+                                    "deleted"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "version": {
+                                  "type": "number"
+                                },
+                                "updatedAt": {
+                                  "type": "string"
+                                },
+                                "deleted": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "patientId",
+                                "lmp",
+                                "edd",
+                                "gravida",
+                                "para",
+                                "riskFactors",
+                                "riskLevel",
+                                "status",
+                                "birthPlan",
+                                "registeredByUserId",
+                                "gestationalAgeDays",
+                                "nextContact",
+                                "version",
+                                "updatedAt",
+                                "deleted"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "lastVisitAt": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "visitCount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "activeProblems",
+                            "currentMedicines",
+                            "allergies",
+                            "lastVitals",
+                            "activePregnancy",
+                            "lastVisitAt",
+                            "visitCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "timeline": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "visit",
+                                  "document",
+                                  "pregnancy_registered",
+                                  "anc_contact",
+                                  "delivery"
+                                ]
+                              },
+                              "at": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "subtitle": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "badge": {
+                                "nullable": true,
+                                "type": "string",
+                                "enum": [
+                                  "green",
+                                  "amber",
+                                  "red"
+                                ]
+                              },
+                              "refId": {
+                                "type": "string"
+                              },
+                              "payload": {}
+                            },
+                            "required": [
+                              "kind",
+                              "at",
+                              "title",
+                              "subtitle",
+                              "badge",
+                              "refId",
+                              "payload"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "pregnancy": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "lmp": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "edd": {
+                              "type": "string"
+                            },
+                            "gravida": {
+                              "type": "number"
+                            },
+                            "para": {
+                              "type": "number"
+                            },
+                            "riskFactors": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "riskLevel": {
+                              "type": "string",
+                              "enum": [
+                                "normal",
+                                "high"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "delivered",
+                                "ended"
+                              ]
+                            },
+                            "birthPlan": {
+                              "nullable": true,
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "registeredByUserId": {
+                              "type": "string"
+                            },
+                            "gestationalAgeDays": {
+                              "type": "number"
+                            },
+                            "nextContact": {
+                              "nullable": true,
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "pregnancyId": {
+                                  "type": "string"
+                                },
+                                "contactNo": {
+                                  "type": "number"
+                                },
+                                "weekTarget": {
+                                  "type": "number"
+                                },
+                                "dueAt": {
+                                  "type": "string"
+                                },
+                                "doneAt": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "providerUserId": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "findings": {
+                                  "nullable": true,
+                                  "type": "object",
+                                  "additionalProperties": {}
+                                },
+                                "dangerSigns": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "triageLevel": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "enum": [
+                                    "green",
+                                    "amber",
+                                    "red"
+                                  ]
+                                },
+                                "triageReasons": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "referral": {
+                                  "nullable": true,
+                                  "type": "object",
+                                  "additionalProperties": {}
+                                },
+                                "version": {
+                                  "type": "number"
+                                },
+                                "updatedAt": {
+                                  "type": "string"
+                                },
+                                "deleted": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "pregnancyId",
+                                "contactNo",
+                                "weekTarget",
+                                "dueAt",
+                                "doneAt",
+                                "providerUserId",
+                                "findings",
+                                "dangerSigns",
+                                "triageLevel",
+                                "triageReasons",
+                                "referral",
+                                "version",
+                                "updatedAt",
+                                "deleted"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "lmp",
+                            "edd",
+                            "gravida",
+                            "para",
+                            "riskFactors",
+                            "riskLevel",
+                            "status",
+                            "birthPlan",
+                            "registeredByUserId",
+                            "gestationalAgeDays",
+                            "nextContact",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "ancContacts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "pregnancyId": {
+                                "type": "string"
+                              },
+                              "contactNo": {
+                                "type": "number"
+                              },
+                              "weekTarget": {
+                                "type": "number"
+                              },
+                              "dueAt": {
+                                "type": "string"
+                              },
+                              "doneAt": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "providerUserId": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "findings": {
+                                "nullable": true,
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "dangerSigns": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "triageLevel": {
+                                "nullable": true,
+                                "type": "string",
+                                "enum": [
+                                  "green",
+                                  "amber",
+                                  "red"
+                                ]
+                              },
+                              "triageReasons": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "referral": {
+                                "nullable": true,
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "version": {
+                                "type": "number"
+                              },
+                              "updatedAt": {
+                                "type": "string"
+                              },
+                              "deleted": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "pregnancyId",
+                              "contactNo",
+                              "weekTarget",
+                              "dueAt",
+                              "doneAt",
+                              "providerUserId",
+                              "findings",
+                              "dangerSigns",
+                              "triageLevel",
+                              "triageReasons",
+                              "referral",
+                              "version",
+                              "updatedAt",
+                              "deleted"
+                            ],
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "required": [
                         "grant",
-                        "patient"
+                        "patient",
+                        "summary",
+                        "timeline",
+                        "pregnancy",
+                        "ancContacts"
                       ],
                       "additionalProperties": false
                     }

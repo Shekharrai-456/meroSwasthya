@@ -1,10 +1,13 @@
+import type { Patient } from '../../../generated/prisma/client.js';
 import { Role } from '../../../generated/prisma/enums.js';
 import { AppError, ErrorCode } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { type AuditDto, type PatientDto, toPatientDto } from '../../lib/serializers.js';
 import type { AuthenticatedUser } from '../../plugins/auth.js';
 import { getAuditForPatient } from '../audit/service.js';
-import type { PatientCreateInput, PatientUpdateInput } from './schemas.js';
+import type { PatientCreateInput, PatientUpdateInput, TimelineQuery } from './schemas.js';
+import { type PatientSummary, buildPatientSummary } from './summary.js';
+import { type TimelineItemDto, buildPatientTimeline } from './timeline.js';
 
 // REQ-PATIENT-001/002: client-generated id makes create naturally idempotent.
 // Same id + same owner -> return the existing row (no-op retry). Same id +
@@ -113,17 +116,37 @@ export async function listPatients(actor: AuthenticatedUser): Promise<PatientDto
   return patients.map(toPatientDto);
 }
 
-// REQ-PATIENT-004: patient entity only, no `summary` block. REQ-PATIENT-005/
-// 006/007 (activeProblems/currentMedicines/lastVitals/activePregnancy/
-// lastVisitAt/visitCount) are all derived from Visit/Pregnancy records,
-// neither of which exists until Phase 5/7 - see docs/PROGRESS.md's Session 4
-// entry for why those REQ rows stay NOT_STARTED rather than being faked here.
-export async function getPatient(patientId: string): Promise<PatientDto> {
+export async function findPatientOrThrow(patientId: string): Promise<Patient> {
   const patient = await prisma.patient.findFirst({ where: { id: patientId, deleted: false } });
   if (!patient) {
     throw new AppError(ErrorCode.NOT_FOUND, 'Patient not found');
   }
-  return toPatientDto(patient);
+  return patient;
+}
+
+// REQ-PATIENT-004..007: full patient plus the computed summary block.
+// Building the summary before the route's own `assertCanReadPatient` call
+// (routes.ts keeps that ordering for its 404-before-403 semantics) means an
+// unauthorized caller's request still pays for the summary queries - a
+// deliberate simplicity tradeoff at this scale (CLAUDE.md §2) rather than
+// splitting existence-check and summary-build across two round trips.
+export async function getPatient(
+  patientId: string,
+): Promise<{ patient: PatientDto; summary: PatientSummary }> {
+  const patient = await findPatientOrThrow(patientId);
+  const summary = await buildPatientSummary(patient);
+  return { patient: toPatientDto(patient), summary };
+}
+
+// REQ-PATIENT-008/009: canRead-gated by the caller (routes.ts), same
+// existence-then-access pattern as GET /patients/:id.
+export async function getPatientTimeline(
+  patientId: string,
+  query: TimelineQuery,
+): Promise<{ items: TimelineItemDto[]; nextBefore: string | null }> {
+  await findPatientOrThrow(patientId);
+  const before = query.before ? new Date(query.before) : null;
+  return buildPatientTimeline(patientId, before, query.limit);
 }
 
 // REQ-PATIENT-010: owner-only, enforced here rather than canReadPatient
