@@ -12,12 +12,12 @@ Foundation, Auth (login/PIN/tokens/RBAC), Patients (family profiles), Access
 Grants (QR sharing), Visits (clinical encounters), Maternal (pregnancy
 registration, the 8-contact ANC schedule, server-side triage, delivery),
 Facilities/code lists/meta (nearby search, picklists, the shared rules
-table, feature flags), and Reminders & SMS (60s worker, mock/Sparrow
-adapters, bilingual BS-date templates, demo SMS panel) are built and
-verified. Everything else in `docs/PROJECT_PLAN.md` (Sync, Documents, most
-seed data) is not yet started — see `docs/FINAL_AUDIT.md` and
-`docs/PROGRESS.md`'s Session 11 entry for the exact per-requirement
-breakdown.
+table, feature flags), Reminders & SMS (60s worker, mock/Sparrow adapters,
+bilingual BS-date templates, demo SMS panel), and Sync (push/pull, per-op
+idempotency, optimistic-concurrency conflicts) are built and verified.
+Documents (Phase 9) and most seed data are not yet started — see
+`docs/FINAL_AUDIT.md` and `docs/PROGRESS.md`'s Session 12 entry for the
+exact per-requirement breakdown.
 
 ## Prerequisites
 

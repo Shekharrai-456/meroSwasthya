@@ -133,18 +133,18 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-SYNC-001 | POST /sync/push, per-change transactions | NOT_STARTED | `src/modules/sync/routes.ts`, `service.ts` | `test/sync.test.ts` | |
-| REQ-SYNC-002 | SyncOp de-dupe by opId | NOT_STARTED | `src/modules/sync/service.ts`, `prisma/schema.prisma` | `test/sync.test.ts` | |
-| REQ-SYNC-003 | Per-table authorization on push | NOT_STARTED | `src/modules/sync/service.ts` | `test/sync.test.ts`, `test/authz-matrix.test.ts` | |
-| REQ-SYNC-004 | Append-only table idempotency | NOT_STARTED | `src/modules/sync/service.ts` | `test/sync.test.ts` | A.6#13 |
-| REQ-SYNC-005 | Versioned table create/conflict/apply | NOT_STARTED | `src/modules/sync/service.ts` | `test/sync.test.ts` | A.6#14 |
-| REQ-SYNC-006 | anc_contacts sync-apply recomputes triage | NOT_STARTED | `src/modules/sync/service.ts` | `test/sync.test.ts` | depends on Phase 7's `rules/triage.ts` — built here as a stub, wired for real once Phase 7 lands |
-| REQ-SYNC-007 | pregnancies-via-sync run full creation logic | NOT_STARTED | `src/modules/sync/service.ts` | `test/sync.test.ts` | same cross-phase dependency as above |
-| REQ-SYNC-008 | zod/authz rejection statuses | NOT_STARTED | `src/modules/sync/service.ts` | `test/sync.test.ts` | |
-| REQ-SYNC-009 | GET /sync/pull, cursor, page 200 | NOT_STARTED | `src/modules/sync/routes.ts`, `service.ts` | `test/sync.test.ts` | |
-| REQ-SYNC-010 | updatedAt server-assigned | NOT_STARTED | `prisma/schema.prisma` (`@updatedAt`) | `test/sync.test.ts` | |
-| REQ-SYNC-011 | Deleted rows returned with deleted=true | NOT_STARTED | `src/modules/sync/service.ts` | `test/sync.test.ts` | moot in practice per Question 4 (nothing sets `deleted=true`), kept for contract completeness |
-| REQ-TEST-002 | sync.test.ts suite | NOT_STARTED | `test/sync.test.ts` | (is the test) | |
+| REQ-SYNC-001 | POST /sync/push, per-change transactions | VERIFIED | `src/modules/sync/routes.ts`, `service.ts` | `test/sync.test.ts` | "per-change transactions" is per-change atomicity via the reused per-entity service functions (each already wraps its own multi-statement writes), not a wrapping `prisma.$transaction` around the whole dispatch - see the anc_contacts create-then-record note in `service.ts` for the one narrow, documented exception |
+| REQ-SYNC-002 | SyncOp de-dupe by opId | VERIFIED | `src/modules/sync/service.ts`, `prisma/schema.prisma` | `test/sync.test.ts` | replayed opId always returns `status:"duplicate"` (not the original status), per this row's own wording |
+| REQ-SYNC-003 | Per-table authorization on push | VERIFIED | `src/modules/sync/service.ts` (delegates to each reused service function's own `canAppend`/role checks) | `test/sync.test.ts` | `documents` excluded entirely (Phase 9 doesn't exist) - a change targeting it fails `table`'s zod enum before authorization is ever reached |
+| REQ-SYNC-004 | Append-only table idempotency | VERIFIED | `src/modules/sync/service.ts` (reuses `createVisit`/`recordDelivery` directly) | `test/sync.test.ts` | A.6#13 |
+| REQ-SYNC-005 | Versioned table create/conflict/apply | VERIFIED | `src/modules/sync/service.ts` | `test/sync.test.ts` | A.6#14 |
+| REQ-SYNC-006 | anc_contacts sync-apply recomputes triage | VERIFIED | `src/modules/sync/service.ts` (reuses `maternal/service.ts`'s `recordContact`) | `test/sync.test.ts` | built directly against the real Phase 7 triage engine, not a stub - Maternal landed in Session 9, well before Sync |
+| REQ-SYNC-007 | pregnancies-via-sync run full creation logic | VERIFIED | `src/modules/sync/service.ts` (reuses `maternal/service.ts`'s `createPregnancy`) | `test/sync.test.ts` | same reuse, same reasoning |
+| REQ-SYNC-008 | zod/authz rejection statuses | VERIFIED | `src/modules/sync/service.ts` | `test/sync.test.ts` | any non-conflict `AppError` (not just `FORBIDDEN`) maps to `rejected` with its own code - a superset of the letter of this row, since `RULE_VIOLATION`/`NOT_FOUND` etc. need the same treatment and there's no reason to special-case just one |
+| REQ-SYNC-009 | GET /sync/pull, cursor, page 200 | VERIFIED | `src/modules/sync/routes.ts`, `service.ts` | `test/sync.test.ts` | merges 5 independently-capped queries in memory (documents excluded, doesn't exist) rather than one SQL UNION - same tradeoff as Facilities' Haversine, acceptable at this scale |
+| REQ-SYNC-010 | updatedAt server-assigned | VERIFIED | `prisma/schema.prisma` (`@updatedAt` on every syncable model, already true since each table was built) | `test/sync.test.ts` | |
+| REQ-SYNC-011 | Deleted rows returned with deleted=true | IMPLEMENTED | `src/modules/sync/service.ts` (pull queries have no `deleted:false` filter) | — | still moot in practice per Question 4 (nothing anywhere sets `deleted=true`) - no test can meaningfully exercise a code path with no producer, kept for contract completeness only |
+| REQ-TEST-002 | sync.test.ts suite | VERIFIED | `test/sync.test.ts` | (is the test) | covers A.6 cases 13/14 (both the `patients` and `anc_contacts` variants of the conflict case), pull ordering/cursor/scope, and REQ-REMIND-009's negative case |
 | REQ-SYNC-012 | Client outbox writes | OUT-OF-REPO (frontend) | — | — | frontend.md §6.2/§7 |
 | REQ-SYNC-013 | SyncEngine triggers | OUT-OF-REPO (frontend) | — | — | |
 | REQ-SYNC-014 | Outbox push batching | OUT-OF-REPO (frontend) | — | — | |
@@ -156,7 +156,7 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-SYNC-020 | Client clock-drift warning | OUT-OF-REPO (frontend) | — | — | backend just returns `serverTime` (covered by REQ-SYNC-001's response shape) |
 | REQ-SYNC-021 | Sync status screen UI | OUT-OF-REPO (frontend) | — | — | |
 | REQ-SYNC-022 | Full offline capability (golden rule) | OUT-OF-REPO (frontend) | — | — | backend enables it by existing; the requirement itself is a client architecture constraint |
-| REQ-SYNC-023 | Deterministic ANC-contact ids (backend half) | NOT_STARTED | `src/lib/ids.ts` | `test/sync.test.ts`, `test/maternal.test.ts` | duplicate of REQ-PREG-004's determinism clause; same code, tracked once |
+| REQ-SYNC-023 | Deterministic ANC-contact ids (backend half) | VERIFIED | `src/lib/ids.ts` (Session 9) | `test/sync.test.ts`, `test/maternal.test.ts`, `test/rules.test.ts` (A.6 case 1) | duplicate of REQ-PREG-004's determinism clause; same code, tracked once |
 
 ## Phase 7 — Maternal (Pregnancy, ANC, Triage)
 
@@ -200,7 +200,7 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-REMIND-005 | GET /patients/:id/reminders | VERIFIED | `src/modules/reminders/routes.ts` | `test/reminders.test.ts` | uses the Session 11-added `Reminder.patientId` index (built in Session 7, ahead of this route) |
 | REQ-REMIND-006 | /demo/sms + .html (mock only) | VERIFIED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | lives in `meta/routes.ts` per backend.md's directory tree, not a separate `public/demo-sms.html` static file - server-rendered on every request instead |
 | REQ-REMIND-007 | /demo/reminders/fire | VERIFIED | `src/modules/reminders/routes.ts` | `test/reminders.test.ts` | |
-| REQ-REMIND-009 | Reminder not syncable (read-only client) | NOT_STARTED | `src/modules/sync/service.ts` (reminders excluded from allowed tables) | `test/sync.test.ts` | enforced as a negative test in Sync's suite - depends on Sync (Phase 6), still NOT_STARTED |
+| REQ-REMIND-009 | Reminder not syncable (read-only client) | VERIFIED | `src/modules/sync/schemas.ts` (`reminders` absent from `SYNCABLE_TABLES`) | `test/sync.test.ts` | enforced as a negative test in Sync's suite |
 | REQ-REMIND-008 | Reminders list UI | OUT-OF-REPO (frontend) | — | — | frontend.md S15 |
 
 ## Phase 9 — Documents & AI Summary

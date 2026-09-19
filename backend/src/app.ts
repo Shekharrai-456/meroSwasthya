@@ -13,6 +13,7 @@ import { maternalRoutes } from './modules/maternal/routes.js';
 import { metaRoutes } from './modules/meta/routes.js';
 import { patientsRoutes } from './modules/patients/routes.js';
 import { remindersRoutes } from './modules/reminders/routes.js';
+import { syncRoutes } from './modules/sync/routes.js';
 import { visitsRoutes } from './modules/visits/routes.js';
 import { envelopePlugin } from './plugins/envelope.js';
 import { rateLimitPlugin } from './plugins/ratelimit.js';
@@ -98,6 +99,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(codelistsRoutes, { prefix: '/api/v1' });
   await app.register(metaRoutes, { prefix: '/api/v1' });
   await app.register(remindersRoutes, { prefix: '/api/v1' });
+  await app.register(syncRoutes, { prefix: '/api/v1' });
 
   return app;
 }

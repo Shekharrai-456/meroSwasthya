@@ -439,3 +439,17 @@ model Delivery {
 
   @@map("deliveries")
 }
+
+// Session 12 (Phase 6 - Sync). REQ-SYNC-002: de-dupes POST /sync/push
+// changes by opId. No secondary index - opId lookups (the PK) are the only
+// query pattern this table serves.
+model SyncOp {
+  opId       String   @id @map("op_id")
+  deviceId   String   @map("device_id")
+  userId     String   @map("user_id")
+  status     String
+  resultJson Json     @map("result_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("sync_ops")
+}
