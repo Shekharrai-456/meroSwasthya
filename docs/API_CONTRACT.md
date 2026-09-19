@@ -118,7 +118,7 @@ Cross-checked against every screen in `frontend.md` §Screens (S01–S23) and th
 | `POST /documents/presign` | access | canAppend | REQ-DOC-001 |
 | `POST /documents/:id/complete` | access | canAppend | REQ-DOC-004 |
 | `GET /documents/:id` | access | canRead | REQ-DOC-005 |
-| `POST /documents/:id/summarize` | access | canAppend | REQ-DOC-006 |
+| `POST /documents/:id/summarize` | access | canRead | REQ-DOC-006 |
 | `GET /pregnancies/:id` | access | canRead | REQ-PREG-008 |
 | `PATCH /pregnancies/:id` | access | canAppend | REQ-PREG-009 |
 | `PUT /pregnancies/:id/contacts/:contactNo` | access | canAppend | REQ-PREG-010 |

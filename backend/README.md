@@ -13,11 +13,13 @@ Grants (QR sharing), Visits (clinical encounters), Maternal (pregnancy
 registration, the 8-contact ANC schedule, server-side triage, delivery),
 Facilities/code lists/meta (nearby search, picklists, the shared rules
 table, feature flags), Reminders & SMS (60s worker, mock/Sparrow adapters,
-bilingual BS-date templates, demo SMS panel), and Sync (push/pull, per-op
-idempotency, optimistic-concurrency conflicts) are built and verified.
-Documents (Phase 9) and most seed data are not yet started — see
-`docs/FINAL_AUDIT.md` and `docs/PROGRESS.md`'s Session 12 entry for the
-exact per-requirement breakdown.
+bilingual BS-date templates, demo SMS panel), Sync (push/pull, per-op
+idempotency, optimistic-concurrency conflicts, all 6 syncable tables
+including Documents metadata), and Documents (presigned S3 upload/download,
+upload-completion check, canRead/canAppend-gated) are built and verified.
+The Tier 2 AI document-summary worker and most seed data are not yet
+started — see `docs/FINAL_AUDIT.md` and `docs/PROGRESS.md`'s Session 13
+entry for the exact per-requirement breakdown.
 
 ## Prerequisites
 
@@ -136,12 +138,18 @@ This has been exercised for real against a live database every time a
 migration was added (see `docs/PROGRESS.md`'s Session 3–6 entries) — it is
 not a theoretical procedure.
 
-## Object storage (MinIO)
+## Object storage (S3-compatible)
 
-Not needed yet — the Documents module (`REQ-DOC-*`) hasn't been built. When
-it is, this section will cover creating the `swc-docs` bucket and the
-presigned-URL/MinIO signature gotcha already researched in
-`docs/TECH_DECISIONS.md`.
+The Documents module (`REQ-DOC-*`) is built against the `S3_*` env vars
+(`.env.example`) via `@aws-sdk/client-s3` + `s3-request-presigner`, with a
+`swc-docs` bucket. It has never been exercised against a live
+S3-compatible server in this environment: MinIO's free pre-built binaries
+were withdrawn (moved behind commercial "AIStor" licensing) before this
+could be verified — see `docs/TECH_DECISIONS.md`'s "Session 13 update".
+Presigning itself needs no network call and is exercised for real by
+`test/documents.test.ts`; the parts that do need a live server
+(confirming an uploaded object exists) are exercised against a fake
+`DocumentStorage` instead, the same pattern used for `SparrowSms`.
 
 ## Everyday commands
 
@@ -197,6 +205,8 @@ This has only ever run in local development. Before any real deployment:
   accepting new requests, waits for in-flight ones (bounded to a 10s hard
   timeout, then force-exits) — send a graceful signal, don't `SIGKILL`
   directly, in any orchestrator's stop sequence.
-- Object storage (MinIO) and any outbound SMS/AI provider are not yet part of
-  this backend's built surface (Documents/Reminders modules, `docs/PROJECT_PLAN.md`
-  Phase 8/9) — nothing to configure for them yet.
+- Object storage (S3-compatible, via `S3_*` env vars) and outbound SMS
+  (Sparrow, via `SMS_MODE=live`) are both built but never verified against a
+  live provider in this environment — set real credentials and flip the mode
+  before relying on either in production. The Tier 2 AI summary provider
+  (`REQ-DOC-007`) is not yet part of this backend's built surface at all.

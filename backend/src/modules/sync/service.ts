@@ -4,11 +4,15 @@ import { prisma } from '../../lib/prisma.js';
 import {
   toAncContactDto,
   toDeliveryDto,
+  toDocumentDto,
   toPatientDto,
   toPregnancyDto,
   toVisitDto,
 } from '../../lib/serializers.js';
 import { assertCanAppendPatient, type AuthenticatedUser } from '../../plugins/auth.js';
+import { documentMetadataUpdateSchema } from '../documents/schemas.js';
+import { s3Storage } from '../documents/storage.js';
+import { updateDocumentMetadata } from '../documents/service.js';
 import {
   createPregnancy,
   findPregnancyOrThrow,
@@ -185,6 +189,38 @@ async function applyDeliveryChange(
   return { status: 'applied', row: result.delivery };
 }
 
+// REQ-SYNC-003: "documents -> canAppend, meta only". Update-only, not
+// create+upload - a presigned upload URL's 15-minute TTL is fundamentally
+// incompatible with outbox-style store-and-forward queuing (a client could
+// sit offline for hours), so document creation always goes through the
+// real-time `POST /documents/presign` REST call (REQ-SYNC-019's own
+// documented "presign -> PUT bytes -> complete" sequence), never sync. A
+// change for a not-yet-existing document is rejected with a message
+// pointing at that endpoint, rather than silently accepted and left in a
+// permanently un-uploadable state.
+async function applyDocumentChange(
+  actor: AuthenticatedUser,
+  change: SyncChangeInput,
+): Promise<ChangeOutcome> {
+  const existing = await prisma.document.findUnique({ where: { id: change.rowId } });
+  if (!existing) {
+    throw new AppError(
+      ErrorCode.VALIDATION_ERROR,
+      'Documents cannot be created via sync - use POST /documents/presign',
+      [{ field: 'rowId', message: 'document does not exist' }],
+    );
+  }
+  if (existing.version !== change.baseVersion) {
+    return { status: 'conflict', current: toDocumentDto(existing) };
+  }
+  const input = documentMetadataUpdateSchema.parse({
+    ...change.payload,
+    version: change.baseVersion,
+  });
+  const updated = await updateDocumentMetadata(actor, change.rowId, input);
+  return { status: 'applied', row: updated };
+}
+
 async function applyChange(
   actor: AuthenticatedUser,
   change: SyncChangeInput,
@@ -200,8 +236,10 @@ async function applyChange(
       return applyAncContactChange(actor, change);
     case 'deliveries':
       return applyDeliveryChange(actor, change);
+    case 'documents':
+      return applyDocumentChange(actor, change);
     default:
-      // Unreachable: `table` is already a zod enum of exactly these 5
+      // Unreachable: `table` is already a zod enum of exactly these 6
       // values (schemas.ts's SYNCABLE_TABLES) - kept for exhaustiveness.
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'Unknown table');
   }
@@ -317,7 +355,7 @@ export async function pullChanges(
     return { changes: [], cursor: query.since ?? since.toISOString(), hasMore: false };
   }
 
-  const [patients, visits, pregnancies, ancContacts, deliveries] = await Promise.all([
+  const [patients, visits, pregnancies, ancContacts, deliveries, documents] = await Promise.all([
     prisma.patient.findMany({
       where: { id: { in: patientIds }, updatedAt: { gt: since } },
       orderBy: { updatedAt: 'asc' },
@@ -343,10 +381,30 @@ export async function pullChanges(
       orderBy: { updatedAt: 'asc' },
       take: PULL_PAGE_SIZE,
     }),
+    prisma.document.findMany({
+      where: { patientId: { in: patientIds }, updatedAt: { gt: since }, deleted: false },
+      orderBy: { updatedAt: 'asc' },
+      take: PULL_PAGE_SIZE,
+    }),
   ]);
 
-  const anyTableMaxedOut = [patients, visits, pregnancies, ancContacts, deliveries].some(
+  const anyTableMaxedOut = [patients, visits, pregnancies, ancContacts, deliveries, documents].some(
     (rows) => rows.length === PULL_PAGE_SIZE,
+  );
+
+  // backend.md §9.7: "documents: include downloadUrl when uploaded" - signed
+  // per-row rather than reusing documents/service.ts's getDocument (which is
+  // canRead-gated per-document; access here is already proven at the
+  // patientIds/accessiblePatients level above).
+  const documentRows = await Promise.all(
+    documents.map(async (d) => ({
+      table: 'documents',
+      row: toDocumentDto(
+        d,
+        d.status === 'uploaded' ? await s3Storage.presignDownload(d.objectKey) : null,
+      ),
+      updatedAt: d.updatedAt,
+    })),
   );
 
   const merged = [
@@ -367,6 +425,7 @@ export async function pullChanges(
       row: toDeliveryDto(r),
       updatedAt: r.updatedAt,
     })),
+    ...documentRows,
   ].sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
 
   const page = merged.slice(0, PULL_PAGE_SIZE);

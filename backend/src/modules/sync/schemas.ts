@@ -1,17 +1,20 @@
 import { z } from 'zod';
 
-// REQ-SYNC-001..008. `table` is restricted to the 5 syncable tables that
-// actually exist in this build - `documents` is part of Part A's documented
-// contract but Documents (Phase 9) doesn't exist yet, so a change targeting
-// it fails this enum and comes back `rejected VALIDATION_ERROR` (a correct,
-// if incidental, fit with REQ-SYNC-008's rejection categories - there is
-// nothing to authorize or apply it against).
+// REQ-SYNC-001..008. `documents` was added in Session 13 once the Documents
+// module existed - see sync/service.ts's `applyDocumentChange` for why it's
+// update-only (metadata fields, never `status`), not full create+upload:
+// a presigned upload URL's 15-minute TTL is fundamentally incompatible with
+// outbox-style store-and-forward queuing, so document creation always goes
+// through the real-time `POST /documents/presign` REST call
+// (REQ-SYNC-019's own documented "presign -> PUT bytes -> complete"
+// sequence), never sync.
 export const SYNCABLE_TABLES = [
   'patients',
   'visits',
   'pregnancies',
   'anc_contacts',
   'deliveries',
+  'documents',
 ] as const;
 export type SyncableTable = (typeof SYNCABLE_TABLES)[number];
 

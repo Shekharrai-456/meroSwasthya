@@ -8,8 +8,8 @@ import { asUser, testClient } from './helpers/client.js';
 import { resetDb, resetRedis } from './helpers/db.js';
 
 // REQ-SYNC-001..011, REQ-TEST-002. Real Postgres + Redis throughout
-// (CLAUDE.md §10). `documents` is deliberately absent from every test here -
-// Documents (Phase 9) doesn't exist yet, see src/modules/sync/schemas.ts.
+// (CLAUDE.md §10). `documents` sync coverage lives alongside the rest of the
+// table-dispatch tests below (Session 13) - see src/modules/sync/schemas.ts.
 
 function samplePatientPayload(overrides: Record<string, unknown> = {}) {
   return {
@@ -225,7 +225,28 @@ describe('sync module', () => {
       expect(result.error.code).toBe('FORBIDDEN');
     });
 
-    it('rejects a change for an unrecognised table at the schema layer (documents not yet built)', async () => {
+    it('rejects a change for an unrecognised table at the schema layer', async () => {
+      const owner = await asUser(app, Role.patient);
+      const res = await owner.post('/api/v1/sync/push', {
+        deviceId: 'dev1',
+        changes: [
+          {
+            opId: randomUUID(),
+            table: 'no_such_table',
+            op: 'upsert',
+            rowId: randomUUID(),
+            baseVersion: 0,
+            payload: {},
+          },
+        ],
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    // REQ-SYNC-003: documents are update-only via sync - a change for a
+    // not-yet-existing document is rejected (200 + result.status
+    // "rejected"), pointing the client at POST /documents/presign instead.
+    it('rejects a documents change for a row that does not exist yet', async () => {
       const owner = await asUser(app, Role.patient);
       const res = await owner.post('/api/v1/sync/push', {
         deviceId: 'dev1',
@@ -240,7 +261,93 @@ describe('sync module', () => {
           },
         ],
       });
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(200);
+      const result = res.json().data.results[0];
+      expect(result.status).toBe('rejected');
+      expect(result.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('applies a documents metadata update via push (meta-only, REQ-SYNC-003)', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post('/api/v1/patients', {
+        id: randomUUID(),
+        name: 'Sita Chaudhary',
+        sex: 'female',
+        dob: '2002-03-15',
+        allergies: [],
+        chronicConditions: [],
+      });
+      const patientId = patientRes.json().data.patient.id;
+      const presignRes = await owner.post('/api/v1/documents/presign', {
+        id: randomUUID(),
+        patientId,
+        type: 'prescription',
+        title: 'Original title',
+        takenAt: '2026-09-18',
+        contentType: 'image/jpeg',
+        sizeBytes: 500_000,
+      });
+      const document = presignRes.json().data.document;
+
+      const res = await owner.post('/api/v1/sync/push', {
+        deviceId: 'dev1',
+        changes: [
+          {
+            opId: randomUUID(),
+            table: 'documents',
+            op: 'upsert',
+            rowId: document.id,
+            baseVersion: document.version,
+            payload: { title: 'Updated via sync', type: 'lab' },
+          },
+        ],
+      });
+      expect(res.statusCode).toBe(200);
+      const result = res.json().data.results[0];
+      expect(result.status).toBe('applied');
+      expect(result.row.title).toBe('Updated via sync');
+      expect(result.row.type).toBe('lab');
+      expect(result.row.version).toBe(document.version + 1);
+    });
+
+    it('a stale baseVersion on a documents update returns conflict with the current row', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post('/api/v1/patients', {
+        id: randomUUID(),
+        name: 'Sita Chaudhary',
+        sex: 'female',
+        dob: '2002-03-15',
+        allergies: [],
+        chronicConditions: [],
+      });
+      const patientId = patientRes.json().data.patient.id;
+      const presignRes = await owner.post('/api/v1/documents/presign', {
+        id: randomUUID(),
+        patientId,
+        type: 'prescription',
+        title: 'Original title',
+        takenAt: '2026-09-18',
+        contentType: 'image/jpeg',
+        sizeBytes: 500_000,
+      });
+      const document = presignRes.json().data.document;
+
+      const res = await owner.post('/api/v1/sync/push', {
+        deviceId: 'dev1',
+        changes: [
+          {
+            opId: randomUUID(),
+            table: 'documents',
+            op: 'upsert',
+            rowId: document.id,
+            baseVersion: document.version + 1, // server has an earlier version
+            payload: { title: 'Updated via sync' },
+          },
+        ],
+      });
+      const result = res.json().data.results[0];
+      expect(result.status).toBe('conflict');
+      expect(result.current.version).toBe(document.version);
     });
 
     it('REQ-REMIND-009: reminders are not a syncable table - the client can never write one via push', async () => {
@@ -578,11 +685,20 @@ describe('sync module', () => {
         outcome: 'live_birth',
         complications: [],
       });
+      await owner.post('/api/v1/documents/presign', {
+        id: randomUUID(),
+        patientId,
+        type: 'prescription',
+        title: 'Prescription',
+        takenAt: '2026-09-18',
+        contentType: 'image/jpeg',
+        sizeBytes: 500_000,
+      });
 
       const res = await owner.get('/api/v1/sync/pull?deviceId=dev1');
       const tables = new Set(res.json().data.changes.map((c: { table: string }) => c.table));
       expect(tables).toEqual(
-        new Set(['patients', 'visits', 'pregnancies', 'anc_contacts', 'deliveries']),
+        new Set(['patients', 'visits', 'pregnancies', 'anc_contacts', 'deliveries', 'documents']),
       );
       const contactRow = res
         .json()
@@ -631,6 +747,37 @@ describe('sync module', () => {
         .json()
         .data.changes.filter((c: { table: string }) => c.table === 'patients');
       expect(patientRows.some((r: { row: { id: string } }) => r.row.id === patientId)).toBe(true);
+    });
+
+    // backend.md §9.7: "documents: include downloadUrl when uploaded". A
+    // pending_upload document pulls with a null downloadUrl (no storage call
+    // needed) - the "uploaded" side can't be exercised over real HTTP in
+    // this environment (no live S3-compatible server, see
+    // docs/TECH_DECISIONS.md), so it stays a documented gap rather than a
+    // faked-out test.
+    it('pulls a pending_upload document with a null downloadUrl', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patientRes = await owner.post(
+        '/api/v1/patients',
+        samplePatientPayload({ id: randomUUID() }),
+      );
+      const patientId = patientRes.json().data.patient.id;
+      await owner.post('/api/v1/documents/presign', {
+        id: randomUUID(),
+        patientId,
+        type: 'prescription',
+        title: 'Prescription',
+        takenAt: '2026-09-18',
+        contentType: 'image/jpeg',
+        sizeBytes: 500_000,
+      });
+
+      const res = await owner.get('/api/v1/sync/pull?deviceId=dev1');
+      const documentRow = res
+        .json()
+        .data.changes.find((c: { table: string }) => c.table === 'documents');
+      expect(documentRow.row.status).toBe('pending_upload');
+      expect(documentRow.row.downloadUrl).toBeNull();
     });
   });
 });

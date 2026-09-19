@@ -73,6 +73,7 @@ model User {
   visitsRecorded        Visit[]
   pregnanciesRegistered Pregnancy[]
   ancContactsRecorded   AncContact[]
+  documentsUploaded     Document[]
 
   @@map("users")
 }
@@ -144,6 +145,7 @@ model Patient {
   visits       Visit[]
   reminders    Reminder[]
   pregnancies  Pregnancy[]
+  documents    Document[]
 
   @@index([ownerUserId])
   @@index([updatedAt])
@@ -452,4 +454,51 @@ model SyncOp {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("sync_ops")
+}
+
+// Session 13 (Phase 9 - Documents). REQ-DOC-001..008. `contentType` is
+// always "image/jpeg" - Question 3 (docs/OPEN_QUESTIONS.md) resolved dropping
+// PNG from the accepted list, since the frontend's only documented capture
+// path already compresses to JPEG.
+enum DocType {
+  prescription
+  lab
+  discharge
+  referral
+  other
+}
+
+enum DocStatus {
+  pending_upload
+  uploaded
+}
+
+enum AiStatus {
+  none
+  queued
+  done
+  failed
+}
+
+model Document {
+  id               String    @id
+  patientId        String    @map("patient_id")
+  patient          Patient   @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  uploadedByUserId String    @map("uploaded_by_user_id")
+  uploadedByUser   User      @relation(fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  type             DocType
+  title            String
+  takenAt          DateTime  @db.Date @map("taken_at")
+  status           DocStatus @default(pending_upload)
+  objectKey        String    @map("object_key")
+  contentType      String    @map("content_type")
+  aiSummary        String?   @map("ai_summary")
+  aiSummaryStatus  AiStatus  @default(none) @map("ai_summary_status")
+  version          Int       @default(1)
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deleted          Boolean   @default(false)
+
+  @@index([patientId])
+  @@index([updatedAt])
+  @@map("documents")
 }

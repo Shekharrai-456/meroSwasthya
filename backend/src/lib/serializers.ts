@@ -4,6 +4,7 @@ import type {
   AuditEntry,
   CodeListItem,
   Delivery,
+  Document,
   Facility,
   Patient,
   Pregnancy,
@@ -399,5 +400,43 @@ export function toPregnancyDto(pregnancy: Pregnancy, contacts: AncContact[] = []
     version: pregnancy.version,
     updatedAt: pregnancy.updatedAt.toISOString(),
     deleted: pregnancy.deleted,
+  };
+}
+
+// REQ-DOC-001..008. `downloadUrl` is computed on read (a fresh presigned
+// URL each time, per REQ-DOC-005), never stored - passed in by the caller
+// since generating it needs the storage adapter, which this file has no
+// business depending on.
+export interface DocumentDto {
+  id: string;
+  patientId: string;
+  uploadedByUserId: string;
+  type: string;
+  title: string;
+  takenAt: string;
+  status: string;
+  downloadUrl: string | null;
+  aiSummary: string | null;
+  aiSummaryStatus: string;
+  version: number;
+  updatedAt: string;
+  deleted: boolean;
+}
+
+export function toDocumentDto(document: Document, downloadUrl: string | null = null): DocumentDto {
+  return {
+    id: document.id,
+    patientId: document.patientId,
+    uploadedByUserId: document.uploadedByUserId,
+    type: document.type,
+    title: document.title,
+    takenAt: toDateOnly(document.takenAt),
+    status: document.status,
+    downloadUrl,
+    aiSummary: document.aiSummary,
+    aiSummaryStatus: document.aiSummaryStatus,
+    version: document.version,
+    updatedAt: document.updatedAt.toISOString(),
+    deleted: document.deleted,
   };
 }

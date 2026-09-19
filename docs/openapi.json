@@ -4807,7 +4807,8 @@
                             "visits",
                             "pregnancies",
                             "anc_contacts",
-                            "deliveries"
+                            "deliveries",
+                            "documents"
                           ]
                         },
                         "op": {
@@ -4981,6 +4982,589 @@
                         "changes",
                         "cursor",
                         "hasMore"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/presign": {
+      "post": {
+        "summary": "Register document metadata and get a presigned upload URL",
+        "tags": [
+          "documents"
+        ],
+        "description": "REQ-DOC-001/002/003. canAppendPatient; size <= 2 MB; image/jpeg only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "patientId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "prescription",
+                      "lab",
+                      "discharge",
+                      "referral",
+                      "other"
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "takenAt": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "contentType": {
+                    "type": "string",
+                    "enum": [
+                      "image/jpeg"
+                    ]
+                  },
+                  "sizeBytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 2097152
+                  }
+                },
+                "required": [
+                  "id",
+                  "patientId",
+                  "type",
+                  "title",
+                  "takenAt",
+                  "contentType",
+                  "sizeBytes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "document": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "uploadedByUserId": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "prescription",
+                                "lab",
+                                "discharge",
+                                "referral",
+                                "other"
+                              ]
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "takenAt": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending_upload",
+                                "uploaded"
+                              ]
+                            },
+                            "downloadUrl": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "aiSummary": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "aiSummaryStatus": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "queued",
+                                "done",
+                                "failed"
+                              ]
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "uploadedByUserId",
+                            "type",
+                            "title",
+                            "takenAt",
+                            "status",
+                            "downloadUrl",
+                            "aiSummary",
+                            "aiSummaryStatus",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "uploadUrl": {
+                          "type": "string"
+                        },
+                        "uploadMethod": {
+                          "type": "string",
+                          "enum": [
+                            "PUT"
+                          ]
+                        },
+                        "uploadHeaders": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "expiresInSec": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "document",
+                        "uploadUrl",
+                        "uploadMethod",
+                        "uploadHeaders",
+                        "expiresInSec"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{id}/complete": {
+      "post": {
+        "summary": "Confirm an upload finished",
+        "tags": [
+          "documents"
+        ],
+        "description": "REQ-DOC-004. HEAD-checks the object; sets status=uploaded; audits document_added.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "document": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "uploadedByUserId": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "prescription",
+                                "lab",
+                                "discharge",
+                                "referral",
+                                "other"
+                              ]
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "takenAt": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending_upload",
+                                "uploaded"
+                              ]
+                            },
+                            "downloadUrl": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "aiSummary": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "aiSummaryStatus": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "queued",
+                                "done",
+                                "failed"
+                              ]
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "uploadedByUserId",
+                            "type",
+                            "title",
+                            "takenAt",
+                            "status",
+                            "downloadUrl",
+                            "aiSummary",
+                            "aiSummaryStatus",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "document"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{id}": {
+      "get": {
+        "summary": "Get document metadata and a fresh download URL",
+        "tags": [
+          "documents"
+        ],
+        "description": "REQ-DOC-005. canRead-gated (REQ-ROLE-003).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "document": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "uploadedByUserId": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "prescription",
+                                "lab",
+                                "discharge",
+                                "referral",
+                                "other"
+                              ]
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "takenAt": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending_upload",
+                                "uploaded"
+                              ]
+                            },
+                            "downloadUrl": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "aiSummary": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "aiSummaryStatus": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "queued",
+                                "done",
+                                "failed"
+                              ]
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "uploadedByUserId",
+                            "type",
+                            "title",
+                            "takenAt",
+                            "status",
+                            "downloadUrl",
+                            "aiSummary",
+                            "aiSummaryStatus",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "document"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{id}/summarize": {
+      "post": {
+        "summary": "Request an AI draft summary (Tier 2)",
+        "tags": [
+          "documents"
+        ],
+        "description": "REQ-DOC-006/007. 501 NOT_IMPLEMENTED when AI_MODE=off, or until the Tier 2 AI worker is built.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "document": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "uploadedByUserId": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "prescription",
+                                "lab",
+                                "discharge",
+                                "referral",
+                                "other"
+                              ]
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "takenAt": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending_upload",
+                                "uploaded"
+                              ]
+                            },
+                            "downloadUrl": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "aiSummary": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "aiSummaryStatus": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "queued",
+                                "done",
+                                "failed"
+                              ]
+                            },
+                            "version": {
+                              "type": "number"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            },
+                            "deleted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "uploadedByUserId",
+                            "type",
+                            "title",
+                            "takenAt",
+                            "status",
+                            "downloadUrl",
+                            "aiSummary",
+                            "aiSummaryStatus",
+                            "version",
+                            "updatedAt",
+                            "deleted"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "document"
                       ],
                       "additionalProperties": false
                     }
