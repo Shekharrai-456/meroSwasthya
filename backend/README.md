@@ -229,8 +229,8 @@ This has only ever run in local development. Before any real deployment:
   accepting new requests, waits for in-flight ones (bounded to a 10s hard
   timeout, then force-exits) — send a graceful signal, don't `SIGKILL`
   directly, in any orchestrator's stop sequence.
-- Object storage (S3-compatible, via `S3_*` env vars) and outbound SMS
-  (Sparrow, via `SMS_MODE=live`) are both built but never verified against a
-  live provider in this environment — set real credentials and flip the mode
-  before relying on either in production. The Tier 2 AI summary provider
-  (`REQ-DOC-007`) is not yet part of this backend's built surface at all.
+- Object storage (S3-compatible, via `S3_*` env vars), outbound SMS
+  (Sparrow, via `SMS_MODE=sparrow`), and the AI document-summary worker
+  (Anthropic, via `AI_MODE=on`) are all fully built but never verified
+  against a live provider in this environment — set real credentials and
+  flip each mode before relying on any of them in production.
