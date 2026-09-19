@@ -19,6 +19,19 @@ export function verifyPin(hash: string, pin: string): Promise<boolean> {
   return argon2.verify(hash, pin);
 }
 
+// Session 8 security-review finding: a nonexistent phone or a user with no
+// pinHash yet returned from `loginWithPin` in roughly zero time, while a
+// registered user with a wrong PIN paid a real ~100ms argon2 verify - a
+// timing side-channel letting a caller distinguish "not a real account" from
+// "real account, wrong PIN" even though both return the identical error
+// message and code. This is a real, valid argon2id hash of an arbitrary
+// value (never anyone's actual PIN), generated once with this project's
+// documented default cost parameters - `loginWithPin` always calls
+// `verifyPin` against either the real user's hash or this one, so both
+// branches pay the same argon2 cost before responding.
+export const DUMMY_PIN_HASH =
+  '$argon2id$v=19$m=65536,p=4,t=3$UwWbMNwg9Qc3gnACqbHbkw$GH91FA4uB64pAJ3SiwiJHn79wmVyEEzxJSQrBWw7z0U';
+
 // Refresh tokens are opaque, high-entropy (256-bit) random bearer values, not
 // low-entropy secrets like a PIN - so unlike the PIN, they are hashed with a
 // fast, deterministic SHA-256 rather than argon2id. This is a deliberate

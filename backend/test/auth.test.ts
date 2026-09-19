@@ -328,6 +328,30 @@ describe('auth module', () => {
       expect(res.json().error.code).toBe('UNAUTHENTICATED');
     });
 
+    // Session 8 security-review finding: an unregistered phone used to
+    // short-circuit before ever running argon2, returning far faster than a
+    // wrong-PIN attempt on a real account - the identical error message alone
+    // didn't close the user-enumeration side-channel, only its timing did.
+    // Fixed by always running a real argon2 verify (against DUMMY_PIN_HASH
+    // when there's no real user/pinHash) before responding either way.
+    it('takes comparable time for an unregistered phone as for a wrong PIN on a real account (timing side-channel)', async () => {
+      const time = async (body: Record<string, unknown>): Promise<number> => {
+        const start = performance.now();
+        await testClient(app).post('/api/v1/auth/pin/login', body);
+        return performance.now() - start;
+      };
+
+      const wrongPinMs = await time({ phone, pin: '0000' });
+      const unregisteredMs = await time({ phone: '+9779801099997', pin: '0000' });
+
+      // A generous bound (not a tight timing assertion, which would be
+      // flaky): before the fix, the unregistered-phone path skipped argon2
+      // entirely and was over an order of magnitude faster. This only checks
+      // that it now pays a comparable, real argon2 cost, not that the two
+      // durations are near-identical.
+      expect(unregisteredMs).toBeGreaterThan(wrongPinMs * 0.3);
+    });
+
     it('locks the account for 15 min after 5 wrong PINs, independent of the request-rate limiter', async () => {
       for (let i = 0; i < 5; i++) {
         const res = await testClient(app).post('/api/v1/auth/pin/login', { phone, pin: '0000' });

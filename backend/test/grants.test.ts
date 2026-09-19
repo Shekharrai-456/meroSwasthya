@@ -106,6 +106,31 @@ describe('grants module', () => {
       expect(res.statusCode).toBe(404);
     });
 
+    // Session 8 security-review finding: ttlMinutes previously had no upper
+    // bound, letting a caller mint a long-lived unprotected QR grant.
+    it('rejects a ttlMinutes above the 60-minute cap', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patient = await createPatientAs(owner);
+      const res = await owner.post('/api/v1/grants', {
+        patientId: patient.id,
+        scope: 'read',
+        ttlMinutes: 61,
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('accepts ttlMinutes exactly at the 60-minute cap', async () => {
+      const owner = await asUser(app, Role.patient);
+      const patient = await createPatientAs(owner);
+      const res = await owner.post('/api/v1/grants', {
+        patientId: patient.id,
+        scope: 'read',
+        ttlMinutes: 60,
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
     it('403 FORBIDDEN when the caller does not own the patient', async () => {
       const owner = await asUser(app, Role.patient);
       const stranger = await asUser(app, Role.patient);

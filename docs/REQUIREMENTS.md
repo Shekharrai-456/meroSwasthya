@@ -82,7 +82,7 @@ Type legend: F = functional, SEC = security, D = data/schema, NFR = non-function
 
 | ID | Requirement | Source | Type | Depends on | Risk | Notes |
 |---|---|---|---|---|---|---|
-| REQ-GRANT-001 | `POST /grants` is owner-only, rate-limited 20/hour/patient, creates an `AccessGrant` + signs a JWT (`typ:"grant", gid, pid, scope, exp`) with `GRANT_SECRET` | backend.md §9.2, §5, A.4 | SEC | REQ-PATIENT-001 | High | |
+| REQ-GRANT-001 | `POST /grants` is owner-only, rate-limited 20/hour/patient, creates an `AccessGrant` + signs a JWT (`typ:"grant", gid, pid, scope, exp`) with `GRANT_SECRET` | backend.md §9.2, §5, A.4 | SEC | REQ-PATIENT-001 | High | **Session 8 addition:** `ttlMinutes` is capped at 60 (`src/modules/grants/schemas.ts`) - not in backend.md's literal text, which leaves it unbounded. Added because an unbounded ttl on this Tier-1 endpoint would let a caller mint the equivalent of REQ-GRANT-012's long-lived QR without that feature's required PIN-at-redeem safeguard. See `docs/PROGRESS.md`'s Session 8 entry. |
 | REQ-GRANT-002 | QR payload string = `"SWC1:" + token`; scanner must reject any other prefix | backend.md §9.2, A.7; frontend.md S20, §14 | F | REQ-GRANT-001 | Med | Version bump path = `SWC2` if the format ever changes |
 | REQ-GRANT-003 | `POST /grants/redeem`: role must be `provider` or `fchv` (else 403 `FORBIDDEN`); parses the `SWC1:` prefix and verifies the JWT with `GRANT_SECRET` | backend.md §9.2, A.4 | SEC | REQ-GRANT-002, REQ-ROLE-002 | High | |
 | REQ-GRANT-004 | Expired grant (`exp < now` or `expiresAt < now`) → 403 `GRANT_EXPIRED`; revoked grant → 403 `GRANT_EXPIRED` | backend.md §9.2, A.3, A.6#15 | F | REQ-GRANT-003 | High | |

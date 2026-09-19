@@ -6,6 +6,7 @@ import { buildApp } from '../src/app.js';
 import { prisma } from '../src/lib/prisma.js';
 import { asUser, testClient } from './helpers/client.js';
 import { resetDb, resetRedis } from './helpers/db.js';
+import { countQueries } from './helpers/queryCount.js';
 
 // REQ-VISIT-*, REQ-ROLE-001/003/004/005. Real Postgres + Redis throughout
 // (CLAUDE.md §10) - no mocked database.
@@ -315,6 +316,54 @@ describe('visits module', () => {
       });
       expect(entries).toHaveLength(1);
       expect(entries[0]?.actorUserId).toBe(owner.user.id);
+    });
+
+    it('does not N+1 on code validation as diagnosisCodes/prescriptions grow (Session 8 perf finding)', async () => {
+      await prisma.codeListItem.createMany({
+        data: [
+          { kind: 'diagnosis', code: 'I10', labelEn: 'Hypertension', labelNp: 'उच्च रक्तचाप' },
+          {
+            kind: 'diagnosis',
+            code: 'D50',
+            labelEn: 'Iron-deficiency anaemia',
+            labelNp: 'रक्तअल्पता',
+          },
+          { kind: 'drug', code: 'ORS', labelEn: 'ORS', labelNp: 'ओआरएस' },
+          { kind: 'drug', code: 'ZINC_20', labelEn: 'Zinc 20 mg', labelNp: 'जिंक' },
+        ],
+      });
+      const owner = await asUser(app, Role.patient);
+      const patient = await createPatient(owner);
+      const rx = (drugCode: string) => ({
+        id: randomUUID(),
+        drugCode,
+        drugName: drugCode,
+        dose: '1 tab',
+        frequency: 'OD',
+        durationDays: 5,
+      });
+
+      const smallCount = await countQueries(async () => {
+        const res = await owner.post(
+          `/api/v1/patients/${patient.id}/visits`,
+          sampleVisitBody({ id: randomUUID(), diagnosisCodes: ['E11'], prescriptions: [] }),
+        );
+        expect(res.statusCode).toBe(200);
+      });
+
+      const largeCount = await countQueries(async () => {
+        const res = await owner.post(
+          `/api/v1/patients/${patient.id}/visits`,
+          sampleVisitBody({
+            id: randomUUID(),
+            diagnosisCodes: ['E11', 'I10', 'D50'],
+            prescriptions: [rx('PARACETAMOL_500'), rx('ORS'), rx('ZINC_20')],
+          }),
+        );
+        expect(res.statusCode).toBe(200);
+      });
+
+      expect(largeCount).toBe(smallCount);
     });
   });
 

@@ -3,7 +3,8 @@
 -- downgrade()" and applied with `prisma db execute --file down.sql` if ever
 -- needed). Drop order respects FK dependencies: children before parents,
 -- enum types after every table that uses them is gone.
--- NOT executed against a real Postgres in this sandbox — see docs/PROGRESS.md.
+-- Applied for real against a live Postgres and re-verified in Session 3
+-- (continued) - see docs/PROGRESS.md's Session 3 (continued) entry.
 
 DROP TABLE IF EXISTS "invite_codes";
 DROP TABLE IF EXISTS "refresh_tokens";

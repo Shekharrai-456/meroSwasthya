@@ -2,7 +2,13 @@ import { Role } from '../../../generated/prisma/enums.js';
 import { config } from '../../config.js';
 import { addDuration } from '../../lib/dates.js';
 import { AppError, ErrorCode } from '../../lib/errors.js';
-import { generateRefreshToken, hashPin, hashRefreshToken, verifyPin } from '../../lib/hash.js';
+import {
+  DUMMY_PIN_HASH,
+  generateRefreshToken,
+  hashPin,
+  hashRefreshToken,
+  verifyPin,
+} from '../../lib/hash.js';
 import { prisma } from '../../lib/prisma.js';
 import {
   checkFixedWindowLimit,
@@ -187,8 +193,14 @@ export async function loginWithPin(
 
   // Same error for "no such user" and "wrong PIN" - never let a caller
   // distinguish an unregistered phone from a registered one with a wrong PIN
-  // (user-enumeration defense).
-  if (!user?.pinHash || !(await verifyPin(user.pinHash, input.pin))) {
+  // (user-enumeration defense). Session 8 finding: the identical error
+  // message alone didn't close this - a missing user/pinHash used to
+  // short-circuit before ever calling verifyPin, so it returned in a
+  // fraction of the time a real wrong-PIN attempt took (a real argon2id
+  // verify). `verifyPin` now always runs, against the real hash or
+  // `DUMMY_PIN_HASH`, so both branches pay the same cost before responding.
+  const pinMatches = await verifyPin(user?.pinHash ?? DUMMY_PIN_HASH, input.pin);
+  if (!user?.pinHash || !pinMatches) {
     await recordPinFailure(input.phone);
     throw new AppError(ErrorCode.UNAUTHENTICATED, 'Invalid phone or PIN');
   }

@@ -65,22 +65,34 @@ function codeCheckEntries(
   return entries;
 }
 
-// REQ-VISIT-003: server fills providerUserId/providerName/facility from the
-// authenticated actor, never from the request body. "Self-reported" applies
-// exactly when the patient owner is the one recording the visit - true
-// regardless of the owner's role, since a patient-role actor can never hold
-// an append grant on someone else's record (grants can only be redeemed by
-// provider/fchv, REQ-GRANT-003), so this is the only way a non-owner-role
-// actor could reach this branch, and the wording keys on ownership, not role.
-async function resolveProviderInfo(
+// REQ-VISIT-003: providerUserId/providerName/facility on the Visit itself are
+// server-filled from the authenticated actor, never the request body.
+// "Self-reported" applies exactly when the patient owner is the one
+// recording the visit - true regardless of the owner's role, since a
+// patient-role actor can never hold an append grant on someone else's
+// record (grants can only be redeemed by provider/fchv, REQ-GRANT-003), so
+// this is the only way a non-owner-role actor could reach this branch, and
+// the wording keys on ownership, not role.
+//
+// Takes the actor's real name/facility as an argument rather than looking it
+// up itself: `getActorAuditInfo` is also always needed for REQ-VISIT-006's
+// audit entry (the audit trail records the real actor, never "Self-reported"),
+// so the caller fetches it once and both this function and the audit write
+// reuse it - avoiding two identical queries in one request (Session 8
+// performance pass finding).
+function resolveVisitProviderInfo(
   actor: AuthenticatedUser,
   patient: Patient,
-): Promise<{ providerName: string; facilityId: string | null; facilityName: string | null }> {
+  actorInfo: { name: string; facilityName: string | null },
+): { providerName: string; facilityId: string | null; facilityName: string | null } {
   if (actor.id === patient.ownerUserId) {
     return { providerName: 'Self-reported', facilityId: null, facilityName: null };
   }
-  const { name, facilityName } = await getActorAuditInfo(actor.id);
-  return { providerName: name, facilityId: actor.facilityId, facilityName };
+  return {
+    providerName: actorInfo.name,
+    facilityId: actor.facilityId,
+    facilityName: actorInfo.facilityName,
+  };
 }
 
 // Minimal, real bilingual follow-up reminder text - not the full templates.ts
@@ -124,7 +136,12 @@ export async function createVisit(
 
   await assertCodesExist(codeCheckEntries(input));
 
-  const { providerName, facilityId, facilityName } = await resolveProviderInfo(actor, patient);
+  const actorInfo = await getActorAuditInfo(actor.id);
+  const { providerName, facilityId, facilityName } = resolveVisitProviderInfo(
+    actor,
+    patient,
+    actorInfo,
+  );
 
   const { visit } = await prisma.$transaction(async (tx) => {
     const createdVisit = await tx.visit.create({
@@ -175,11 +192,10 @@ export async function createVisit(
   // REQ-VISIT-006. Not inside the transaction above, same convention as
   // every other module's audit write (grants/service.ts, plugins/auth.ts) -
   // audit is a best-effort side effect of a successfully committed write,
-  // not part of its atomic unit.
-  const { name, facilityName: actorFacilityName } = await getActorAuditInfo(actor.id);
+  // not part of its atomic unit. Reuses `actorInfo` fetched above.
   await logAudit({
     patientId,
-    actor: { ...actor, name, facilityName: actorFacilityName },
+    actor: { ...actor, name: actorInfo.name, facilityName: actorInfo.facilityName },
     action: AuditAction.visit_added,
   });
 

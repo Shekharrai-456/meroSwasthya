@@ -49,7 +49,7 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 | REQ-AUTH-003 | Demo OTP 123456 | VERIFIED | `src/modules/auth/service.ts` | `test/auth.test.ts` | gated on `OTP_MODE`, not `SMS_MODE` - backend.md A.4 vs §7.1 mismatch, see Session 3 PROGRESS entry |
 | REQ-AUTH-004 | POST /auth/otp/verify, tempToken | VERIFIED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | |
 | REQ-AUTH-005 | POST /auth/pin/set (create + reset) | VERIFIED | `src/modules/auth/service.ts` | `test/auth.test.ts` | Question 2: also used for PIN reset |
-| REQ-AUTH-006 | POST /auth/pin/login + account lockout | VERIFIED | `src/modules/auth/service.ts`, `src/lib/rateLimiter.ts` | `test/auth.test.ts` | Question 6: stacked with REQ-SEC-001's route limit |
+| REQ-AUTH-006 | POST /auth/pin/login + account lockout | VERIFIED | `src/modules/auth/service.ts`, `src/lib/rateLimiter.ts` | `test/auth.test.ts` | Question 6: stacked with REQ-SEC-001's route limit. Session 8: fixed a timing side-channel (unregistered phone short-circuited before argon2; now always runs `verifyPin` against a `DUMMY_PIN_HASH` when there's no real one) - see `docs/SECURITY.md` row 2 |
 | REQ-AUTH-007 | POST /auth/refresh, rotation | VERIFIED | `src/modules/auth/service.ts` | `test/auth.test.ts` | reuse-detection revokes the whole token family, docs/SECURITY.md row 5 |
 | REQ-AUTH-008 | POST /auth/provider/activate | VERIFIED | `src/modules/auth/routes.ts`, `service.ts` | `test/auth.test.ts` | `Facility`/`InviteCode` schema pulled forward from Phase 1 (hard FK dependency); seed script itself (REQ-SEED-001) still NOT_STARTED, tests use ad-hoc fixtures |
 | REQ-AUTH-009 | GET /me | VERIFIED | `src/modules/auth/routes.ts` | `test/auth.test.ts` | |
@@ -99,7 +99,7 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-GRANT-001 | POST /grants create + rate limit | VERIFIED | `src/modules/grants/routes.ts`, `service.ts` | `test/grants.test.ts` | |
+| REQ-GRANT-001 | POST /grants create + rate limit | VERIFIED | `src/modules/grants/routes.ts`, `service.ts` | `test/grants.test.ts` | Session 8: capped `ttlMinutes` at 60 (was unbounded) - see `docs/SECURITY.md` row 8, `docs/REQUIREMENTS.md`'s note on this row |
 | REQ-GRANT-002 | qrPayload = "SWC1:" + token | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | |
 | REQ-GRANT-003 | POST /grants/redeem, role check | VERIFIED | `src/modules/grants/service.ts`, `routes.ts` | `test/grants.test.ts` | |
 | REQ-GRANT-004 | Expired/revoked → GRANT_EXPIRED | VERIFIED | `src/modules/grants/service.ts` | `test/grants.test.ts` | A.6#15 |
