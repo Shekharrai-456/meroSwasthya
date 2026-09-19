@@ -4180,6 +4180,268 @@
           }
         }
       }
+    },
+    "/facilities/nearby": {
+      "get": {
+        "summary": "Nearest facilities by straight-line distance",
+        "tags": [
+          "facilities"
+        ],
+        "description": "REQ-FACILITY-001. Haversine; optional birthing=true filter; sorted; limited.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "health_post",
+                                  "phcc",
+                                  "hospital",
+                                  "birthing_centre"
+                                ]
+                              },
+                              "hasBirthingCentre": {
+                                "type": "boolean"
+                              },
+                              "phone": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "lat": {
+                                "type": "number"
+                              },
+                              "lng": {
+                                "type": "number"
+                              },
+                              "municipality": {
+                                "type": "string"
+                              },
+                              "distanceKm": {
+                                "nullable": true,
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "type",
+                              "hasBirthingCentre",
+                              "phone",
+                              "lat",
+                              "lng",
+                              "municipality",
+                              "distanceKm"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/codelists": {
+      "get": {
+        "summary": "All picklist items, optionally filtered by kind",
+        "tags": [
+          "codelists"
+        ],
+        "description": "REQ-CODELIST-001. Cached on the device with the returned version.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "string"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "labelEn": {
+                                "type": "string"
+                              },
+                              "labelNp": {
+                                "type": "string"
+                              },
+                              "meta": {
+                                "nullable": true,
+                                "type": "object",
+                                "additionalProperties": {}
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "code",
+                              "labelEn",
+                              "labelNp",
+                              "meta"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules": {
+      "get": {
+        "summary": "The shared RULES table verbatim",
+        "tags": [
+          "meta"
+        ],
+        "description": "REQ-META-001. ancSchedule, dangerSigns, riskFactors, triage, reminders.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config": {
+      "get": {
+        "summary": "Feature flags",
+        "tags": [
+          "meta"
+        ],
+        "description": "REQ-META-002. Lets the app hide unavailable features.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "smsMode": {
+                          "type": "string",
+                          "enum": [
+                            "mock",
+                            "sparrow"
+                          ]
+                        },
+                        "aiSummaryEnabled": {
+                          "type": "boolean"
+                        },
+                        "otpDemo": {
+                          "type": "boolean"
+                        },
+                        "rulesVersion": {
+                          "type": "string"
+                        },
+                        "codelistVersion": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "smsMode",
+                        "aiSummaryEnabled",
+                        "otpDemo",
+                        "rulesVersion",
+                        "codelistVersion"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "servers": [

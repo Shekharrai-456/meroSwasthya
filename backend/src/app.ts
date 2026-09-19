@@ -6,8 +6,11 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { config } from './config.js';
 import { healthPlugin } from './health.js';
 import { authRoutes } from './modules/auth/routes.js';
+import { codelistsRoutes } from './modules/codelists/routes.js';
+import { facilitiesRoutes } from './modules/facilities/routes.js';
 import { grantsRoutes } from './modules/grants/routes.js';
 import { maternalRoutes } from './modules/maternal/routes.js';
+import { metaRoutes } from './modules/meta/routes.js';
 import { patientsRoutes } from './modules/patients/routes.js';
 import { visitsRoutes } from './modules/visits/routes.js';
 import { envelopePlugin } from './plugins/envelope.js';
@@ -90,6 +93,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(grantsRoutes, { prefix: '/api/v1' });
   await app.register(visitsRoutes, { prefix: '/api/v1' });
   await app.register(maternalRoutes, { prefix: '/api/v1' });
+  await app.register(facilitiesRoutes, { prefix: '/api/v1' });
+  await app.register(codelistsRoutes, { prefix: '/api/v1' });
+  await app.register(metaRoutes, { prefix: '/api/v1' });
 
   return app;
 }

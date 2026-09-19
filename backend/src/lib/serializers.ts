@@ -2,6 +2,7 @@ import type {
   AccessGrant,
   AncContact,
   AuditEntry,
+  CodeListItem,
   Delivery,
   Facility,
   Patient,
@@ -134,6 +135,25 @@ export function toGrantDto(grant: AccessGrant): GrantDto {
     accessUntil: grant.accessUntil?.toISOString() ?? null,
     revokedAt: grant.revokedAt?.toISOString() ?? null,
     createdAt: grant.createdAt.toISOString(),
+  };
+}
+
+// REQ-CODELIST-002.
+export interface CodeListItemDto {
+  kind: string;
+  code: string;
+  labelEn: string;
+  labelNp: string;
+  meta: Record<string, unknown> | null;
+}
+
+export function toCodeListItemDto(item: CodeListItem): CodeListItemDto {
+  return {
+    kind: item.kind,
+    code: item.code,
+    labelEn: item.labelEn,
+    labelNp: item.labelNp,
+    meta: item.meta as Record<string, unknown> | null,
   };
 }
 

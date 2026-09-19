@@ -240,3 +240,22 @@ Real coverage: 94.49% statements overall; `maternal/service.ts` 94.17%, `rules/{
 - **`recordDelivery`'s idempotency check runs before the `status must be active` check**, mirroring Visits' precedent exactly: a client retrying the same delivery `id` after a successful create (pregnancy now `delivered`, no longer `active`) must get the same success response back, not a spurious 422 from re-evaluating a rule that only applies to genuinely new deliveries.
 **Blocked / not verified:** nothing new. Same Docker-never-available caveat as every prior session.
 **Next task:** Session 10 — likely Sync (`docs/PROJECT_PLAN.md` Phase 6, now fully unblocked) or Reminders (Phase 8, since real `anc_due`/`anc_missed`/`follow_up` rows now exist to poll and send) - both are now genuinely buildable with no missing dependency. Facilities/codelists routes + full seed data (Phase 1 remainder) remain the lowest-effort, highest-demo-value gap regardless of which is picked next.
+
+## 2026-09-19 — Session 10 — Facilities, code lists, meta (Phase 1 remainder)
+
+**Requirements:** REQ-FACILITY-001/002 (VERIFIED), REQ-CODELIST-001/002 (VERIFIED), REQ-META-001/002 (VERIFIED). Also corrected two stale `docs/PROJECT_PLAN.md` rows found while updating this phase: `REQ-AUDIT-001`'s note (`contact_recorded` was already wired in Session 9, not reflected until now) and `REQ-AUDIT-003` (a duplicate tracking row for `REQ-PATIENT-010`, stuck at `NOT_STARTED` since Session 0 despite `docs/FINAL_AUDIT.md`'s Session 6 entry already noting it should read `VERIFIED`).
+**Created:** `src/modules/facilities/{schemas,service,routes,docSchemas}.ts`, `src/modules/codelists/{schemas,service,routes,docSchemas}.ts`, `src/modules/meta/routes.ts`, `test/facilities.test.ts`, `test/codelists.test.ts`, `test/meta.test.ts`
+**Modified:** `src/lib/serializers.ts` (`toCodeListItemDto`), `src/app.ts` (registers the three new route modules), `docs/PROJECT_PLAN.md`, `docs/openapi.json`
+**Commands run:** `npm run check` (×2), `npm run openapi:export`
+**Result:** `npm run check` — **format/lint/typecheck clean, 195/195 tests passed** (186 carried over + 9 new). Real tail:
+```
+Test Files  11 passed (11)
+     Tests  195 passed (195)
+```
+**Decisions:**
+- **Picked this phase next over Sync/Reminders** because it's genuinely foundational rather than a specific feature: `GET /config`, `GET /codelists`, and `GET /rules` are the three unauthenticated bootstrap calls almost any real client makes before it can do anything else (feature flags, picklists, the rules table for local triage), and REQ-CODELIST-001 in particular was the one piece of Session 7/8's `CodeListItem` pull-forward that had never been exposed as an actual route.
+- **`GET /rules` serves `src/modules/maternal/rules/rules.json` directly** rather than duplicating the RULES object into the Meta module - it's imported from where it already lives (built in Session 9), keeping exactly one copy of the shared rule table in this codebase, matching REQ-RULES-001's own "versioned, single source" intent.
+- **`GET /demo/sms`/`.html` were deliberately not built this session** despite living in `meta/routes.ts` per `backend.md`'s directory tree - they need the `MockSms` table and the Reminders module's SMS adapter (Phase 8, still NOT_STARTED), so building them now would mean either a fake response or a second migration touching an unrelated phase's schema.
+- **`prisma/seed.ts` was not extended to seed real facilities/invite codes/demo patients this session** (`REQ-SEED-001`) - it remains scoped to the codelist seed from Session 7. Building the full demo dataset (4 facilities, 3 invite codes, 3 users, 3 patients with visits/pregnancy/reminders) is a genuinely separate, sizeable content-authoring task, not a natural extension of "add three read-only reference endpoints," and every test in this session seeds its own minimal facility/codelist fixtures directly rather than depending on it.
+**Blocked / not verified:** nothing new.
+**Next task:** Session 11 — Reminders (Phase 8: worker polling every 60s, `SmsAdapter`/mock, `GET /patients/:id/reminders`, `/demo/sms(.html)`, `/demo/reminders/fire`) or Sync (Phase 6) - both fully unblocked now. Reminders is the more natural next step: real `anc_due`/`anc_missed`/`follow_up` rows already exist from Sessions 7/9 with nothing yet to actually send or display them.
