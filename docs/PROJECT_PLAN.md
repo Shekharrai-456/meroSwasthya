@@ -193,14 +193,14 @@ Phases are ordered by real technical dependency (per `backend.md` §14's own bui
 
 | ID | Requirement (short) | Status | Code location (planned) | Test location (planned) | Notes |
 |---|---|---|---|---|---|
-| REQ-REMIND-001 | Worker polls every 60s | NOT_STARTED | `src/modules/reminders/worker.ts` | `test/reminders.test.ts` | |
-| REQ-REMIND-002 | SmsAdapter (Mock/Sparrow) | NOT_STARTED | `src/modules/reminders/sms/{adapter,mock,sparrow}.ts` | `test/reminders.test.ts` | Sparrow: verify current API before relying on it |
-| REQ-REMIND-003 | Retry ×3 then failed | NOT_STARTED | `src/modules/reminders/worker.ts` | `test/reminders.test.ts` | |
-| REQ-REMIND-004 | Bilingual templates + BS date | NOT_STARTED | `src/modules/reminders/templates.ts` | `test/reminders.test.ts` | |
-| REQ-REMIND-005 | GET /patients/:id/reminders | NOT_STARTED | `src/modules/reminders/routes.ts` | `test/reminders.test.ts` | uses the Phase 5.5-added `Reminder.patientId` index |
-| REQ-REMIND-006 | /demo/sms + .html (mock only) | NOT_STARTED | `src/modules/meta/routes.ts`, `public/demo-sms.html` | `test/reminders.test.ts` | |
-| REQ-REMIND-007 | /demo/reminders/fire | NOT_STARTED | `src/modules/meta/routes.ts` | `test/reminders.test.ts` | |
-| REQ-REMIND-009 | Reminder not syncable (read-only client) | NOT_STARTED | `src/modules/sync/service.ts` (reminders excluded from allowed tables) | `test/sync.test.ts` | enforced as a negative test in Sync's suite |
+| REQ-REMIND-001 | Worker polls every 60s | VERIFIED | `src/modules/reminders/{service,worker}.ts` | `test/reminders.test.ts` | polling logic (`processPendingReminders`) tested directly; the BullMQ repeatable-job wiring itself (`worker.ts`) is exercised only by running the real server, same as `server.ts`'s `app.listen()` |
+| REQ-REMIND-002 | SmsAdapter (Mock/Sparrow) | VERIFIED | `src/modules/reminders/sms/{adapter,mock,sparrow}.ts` | `test/reminders.test.ts` (via a fake adapter), `test/meta.test.ts` (mock's `mock_sms` writes) | Sparrow's current API verified against its own docs this session (`docs/TECH_DECISIONS.md`) but never exercised against a real account - no `SPARROW_TOKEN` in this environment, `SMS_MODE` stays `mock` |
+| REQ-REMIND-003 | Retry ×3 then failed | VERIFIED | `src/modules/reminders/service.ts` (`attempts` column, not in backend.md's literal schema - see `docs/DATA_MODEL.md`) | `test/reminders.test.ts` | |
+| REQ-REMIND-004 | Bilingual templates + BS date | VERIFIED | `src/modules/reminders/templates.ts`, `src/lib/bsDate.ts` | `test/rules.test.ts` (indirectly, via Visits/Maternal's reminder creation), `test/reminders.test.ts` | also now used by `visits/service.ts`/`maternal/service.ts`, replacing their Session 7/9 AD-only inline versions |
+| REQ-REMIND-005 | GET /patients/:id/reminders | VERIFIED | `src/modules/reminders/routes.ts` | `test/reminders.test.ts` | uses the Session 11-added `Reminder.patientId` index (built in Session 7, ahead of this route) |
+| REQ-REMIND-006 | /demo/sms + .html (mock only) | VERIFIED | `src/modules/meta/routes.ts` | `test/meta.test.ts` | lives in `meta/routes.ts` per backend.md's directory tree, not a separate `public/demo-sms.html` static file - server-rendered on every request instead |
+| REQ-REMIND-007 | /demo/reminders/fire | VERIFIED | `src/modules/reminders/routes.ts` | `test/reminders.test.ts` | |
+| REQ-REMIND-009 | Reminder not syncable (read-only client) | NOT_STARTED | `src/modules/sync/service.ts` (reminders excluded from allowed tables) | `test/sync.test.ts` | enforced as a negative test in Sync's suite - depends on Sync (Phase 6), still NOT_STARTED |
 | REQ-REMIND-008 | Reminders list UI | OUT-OF-REPO (frontend) | — | — | frontend.md S15 |
 
 ## Phase 9 — Documents & AI Summary

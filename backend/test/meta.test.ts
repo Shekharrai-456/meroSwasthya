@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { prisma } from '../src/lib/prisma.js';
 import { testClient } from './helpers/client.js';
 import { resetDb, resetRedis } from './helpers/db.js';
 
@@ -50,6 +51,37 @@ describe('meta module', () => {
       expect(body.aiSummaryEnabled).toBe(false);
       expect(typeof body.rulesVersion).toBe('string');
       expect(typeof body.codelistVersion).toBe('string');
+    });
+  });
+
+  describe('GET /api/v1/demo/sms and /demo/sms.html (REQ-REMIND-006, SMS_MODE=mock)', () => {
+    it('needs no authentication and returns the last 50 mock SMS, newest first', async () => {
+      // Explicit, distinct sentAt values - createMany runs as one INSERT
+      // inside one transaction, so Postgres's now() would otherwise give
+      // every row the identical default timestamp, making DESC order
+      // ambiguous.
+      await prisma.mockSms.createMany({
+        data: [
+          { to: '+9779801000001', text: 'first', sentAt: new Date(Date.now() - 1000) },
+          { to: '+9779801000002', text: 'second', sentAt: new Date() },
+        ],
+      });
+      const client = testClient(app);
+      const res = await client.get('/api/v1/demo/sms');
+      expect(res.statusCode).toBe(200);
+      const items = res.json().data.items;
+      expect(items).toHaveLength(2);
+      expect(items[0].text).toBe('second');
+    });
+
+    it('serves an auto-refreshing HTML page', async () => {
+      await prisma.mockSms.create({ data: { to: '+9779801000001', text: 'projector test' } });
+      const client = testClient(app);
+      const res = await client.get('/api/v1/demo/sms.html');
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toContain('text/html');
+      expect(res.body).toContain('http-equiv="refresh"');
+      expect(res.body).toContain('projector test');
     });
   });
 });

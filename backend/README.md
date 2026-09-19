@@ -10,12 +10,14 @@ requirement-by-requirement status of what's actually built and verified.
 
 Foundation, Auth (login/PIN/tokens/RBAC), Patients (family profiles), Access
 Grants (QR sharing), Visits (clinical encounters), Maternal (pregnancy
-registration, the 8-contact ANC schedule, server-side triage, delivery), and
+registration, the 8-contact ANC schedule, server-side triage, delivery),
 Facilities/code lists/meta (nearby search, picklists, the shared rules
-table, feature flags) are built and verified. Everything else in
-`docs/PROJECT_PLAN.md` (Sync, Reminders, Documents, most seed data) is not
-yet started — see `docs/FINAL_AUDIT.md` and `docs/PROGRESS.md`'s Session 10
-entry for the exact per-requirement breakdown.
+table, feature flags), and Reminders & SMS (60s worker, mock/Sparrow
+adapters, bilingual BS-date templates, demo SMS panel) are built and
+verified. Everything else in `docs/PROJECT_PLAN.md` (Sync, Documents, most
+seed data) is not yet started — see `docs/FINAL_AUDIT.md` and
+`docs/PROGRESS.md`'s Session 11 entry for the exact per-requirement
+breakdown.
 
 ## Prerequisites
 

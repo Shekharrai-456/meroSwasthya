@@ -249,9 +249,12 @@ The `pregnancyId @unique` constraint is the DB-level backing for REQ-PREG-015's 
 | messageNp | string | |
 | messageEn | string | |
 | status | ReminderStatus | default `pending` |
+| attempts | int | default 0 - **not in `backend.md`'s literal schema**, added Session 11 |
 | sentAt | timestamptz? | |
 
-Indexes: `@@index([status, dueAt])` — the worker's poll query (REQ-REMIND-001), already in `backend.md`. **Added index (not in `backend.md`'s literal schema):** `@@index([patientId])` — required by `GET /patients/:id/reminders` (REQ-REMIND-005), which has no other index to use without one; its absence in the original schema would force a full-table scan as reminder volume grows.
+Indexes: `@@index([status, dueAt])` — the worker's poll query (REQ-REMIND-001), already in `backend.md` (built in Session 11 once the worker existed - the column existed since Session 7 without this index, since nothing queried by it yet). **Added index (not in `backend.md`'s literal schema):** `@@index([patientId])` — required by `GET /patients/:id/reminders` (REQ-REMIND-005), which has no other index to use without one; its absence in the original schema would force a full-table scan as reminder volume grows.
+
+**`attempts` (Session 11 addition):** REQ-REMIND-003 ("retry next tick up to 3 times, then failed") requires counting failures per reminder across worker ticks - structurally impossible without a persisted counter, since the worker is a stateless poll (`WHERE status='pending' AND dueAt<=now()`) that could otherwise never distinguish a reminder's first failure from its fourth. `backend.md`'s literal schema has no such column; added here as a necessary correctness fix, not a stylistic addition.
 
 **Session 7 pull-forward note:** the table itself was built early (Phase 5 - Visits needs it for `REQ-VISIT-005`'s follow-up reminder), without waiting for Phase 8. Only the columns Visits actually writes exist so far - `pregnancyId` is deferred to Phase 7 (see `prisma/schema.prisma`'s comment on the model; it would reference a `Pregnancy` table that doesn't exist yet). `@@index([status, dueAt])` is deferred to Phase 8 alongside it: nothing queries by it until the reminder worker (`REQ-REMIND-001`) exists, so building it now would be an unused index with only write-side cost. `@@index([patientId])` is built now since `Visits` (indirectly, via a future `GET /patients/:id/reminders`) and this pull-forward both need patient-scoped lookups to stay efficient.
 

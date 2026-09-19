@@ -22,6 +22,7 @@ import {
   getActorAuditInfo,
 } from '../../plugins/auth.js';
 import { logAudit } from '../audit/service.js';
+import { buildAncDueMessages, buildAncMissedMessages } from '../reminders/templates.js';
 import { eddFromLmp, gestationalAgeDays } from './rules/edd.js';
 import { generateContactSchedule } from './rules/schedule.js';
 import { triage } from './rules/triage.js';
@@ -48,32 +49,6 @@ export async function findPregnancyOrThrow(pregnancyId: string): Promise<Pregnan
     throw new AppError(ErrorCode.NOT_FOUND, 'Pregnancy not found');
   }
   return pregnancy;
-}
-
-// Minimal, real bilingual reminder text - same "not the full Phase 8
-// templates.ts" reasoning as Visits' follow_up reminder (see
-// visits/service.ts). Dates stay AD.
-function buildAncDueMessages(
-  patientName: string,
-  contactNo: number,
-  weekTarget: number,
-  dueAt: string,
-): { np: string; en: string } {
-  return {
-    np: `${patientName} को गर्भ जाँच ${contactNo} (हप्ता ${weekTarget}) मिति ${dueAt} मा तोकिएको छ। कृपया नजिकको स्वास्थ्य संस्थामा जानुहोस्।`,
-    en: `${patientName}'s ANC contact ${contactNo} (week ${weekTarget}) is due on ${dueAt}. Please visit your health facility.`,
-  };
-}
-
-function buildAncMissedMessages(
-  patientName: string,
-  contactNo: number,
-  dueAt: string,
-): { np: string; en: string } {
-  return {
-    np: `${patientName} को गर्भ जाँच ${contactNo} मिति ${dueAt} मा हुनुपर्थ्यो तर अझै भएको छैन। कृपया चाँडै स्वास्थ्य संस्थामा सम्पर्क गर्नुहोस्।`,
-    en: `${patientName}'s ANC contact ${contactNo} was due on ${dueAt} and hasn't been completed yet. Please visit as soon as possible.`,
-  };
 }
 
 // REQ-PREG-001..007: sex must be female, no second active pregnancy, edd/

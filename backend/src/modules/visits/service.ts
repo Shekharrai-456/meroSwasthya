@@ -11,6 +11,7 @@ import {
   getActorAuditInfo,
 } from '../../plugins/auth.js';
 import { logAudit } from '../audit/service.js';
+import { buildFollowUpMessages } from '../reminders/templates.js';
 import type { VisitCreateInput } from './schemas.js';
 
 export async function findPatientOrThrow(patientId: string): Promise<Patient> {
@@ -92,22 +93,6 @@ function resolveVisitProviderInfo(
     providerName: actorInfo.name,
     facilityId: actor.facilityId,
     facilityName: actorInfo.facilityName,
-  };
-}
-
-// Minimal, real bilingual follow-up reminder text - not the full templates.ts
-// module (backend.md §9.6, Phase 8), which doesn't exist yet and would need a
-// BS-date-conversion dependency this phase has no other use for (CLAUDE.md
-// §15: one dependency per real need). Dates stay AD here; Phase 8's real
-// templates module is expected to replace this with BS-formatted text for
-// every reminder kind at once, not just this one.
-function buildFollowUpMessages(
-  patientName: string,
-  followUpAt: string,
-): { np: string; en: string } {
-  return {
-    np: `${patientName} को पुन: जाँच मिति ${followUpAt} मा तोकिएको छ। कृपया समयमा स्वास्थ्य संस्था जानुहोस्।`,
-    en: `Follow-up visit for ${patientName} is due on ${followUpAt}. Please visit the health facility on time.`,
   };
 }
 

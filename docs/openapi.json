@@ -4442,6 +4442,335 @@
           }
         }
       }
+    },
+    "/demo/sms": {
+      "get": {
+        "summary": "Mock SMS outbox (SMS_MODE=mock only)",
+        "tags": [
+          "reminders"
+        ],
+        "description": "REQ-REMIND-006. 404 when SMS_MODE != mock. Last 50, newest first.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "to": {
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string"
+                              },
+                              "sentAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "to",
+                              "text",
+                              "sentAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demo/sms.html": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/patients/{id}/reminders": {
+      "get": {
+        "summary": "Upcoming and recently sent reminders for a patient",
+        "tags": [
+          "reminders"
+        ],
+        "description": "REQ-REMIND-005. canRead-gated (REQ-ROLE-003). Upcoming pending + last 20 sent.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "patientId": {
+                                "type": "string"
+                              },
+                              "pregnancyId": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "anc_due",
+                                  "anc_missed",
+                                  "follow_up",
+                                  "medicine"
+                                ]
+                              },
+                              "dueAt": {
+                                "type": "string"
+                              },
+                              "channel": {
+                                "type": "string",
+                                "enum": [
+                                  "sms",
+                                  "push"
+                                ]
+                              },
+                              "recipientPhone": {
+                                "type": "string"
+                              },
+                              "recipientRole": {
+                                "type": "string"
+                              },
+                              "messageNp": {
+                                "type": "string"
+                              },
+                              "messageEn": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "sent",
+                                  "failed",
+                                  "cancelled"
+                                ]
+                              },
+                              "sentAt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "patientId",
+                              "pregnancyId",
+                              "kind",
+                              "dueAt",
+                              "channel",
+                              "recipientPhone",
+                              "recipientRole",
+                              "messageNp",
+                              "messageEn",
+                              "status",
+                              "sentAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demo/reminders/fire": {
+      "post": {
+        "summary": "Force the next pending reminder for a patient to fire now (demo only)",
+        "tags": [
+          "reminders"
+        ],
+        "description": "REQ-REMIND-007. SMS_MODE=mock only; 404 otherwise.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "patientId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "patientId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reminder": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "patientId": {
+                              "type": "string"
+                            },
+                            "pregnancyId": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "anc_due",
+                                "anc_missed",
+                                "follow_up",
+                                "medicine"
+                              ]
+                            },
+                            "dueAt": {
+                              "type": "string"
+                            },
+                            "channel": {
+                              "type": "string",
+                              "enum": [
+                                "sms",
+                                "push"
+                              ]
+                            },
+                            "recipientPhone": {
+                              "type": "string"
+                            },
+                            "recipientRole": {
+                              "type": "string"
+                            },
+                            "messageNp": {
+                              "type": "string"
+                            },
+                            "messageEn": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending",
+                                "sent",
+                                "failed",
+                                "cancelled"
+                              ]
+                            },
+                            "sentAt": {
+                              "nullable": true,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "patientId",
+                            "pregnancyId",
+                            "kind",
+                            "dueAt",
+                            "channel",
+                            "recipientPhone",
+                            "recipientRole",
+                            "messageNp",
+                            "messageEn",
+                            "status",
+                            "sentAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "reminder"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "servers": [

@@ -258,14 +258,10 @@ enum ReminderStatus {
   cancelled
 }
 
-// Pulled forward from its documented Phase 8 slot: REQ-VISIT-005 ("if
-// followUpAt is set, create a follow_up Reminder") is a hard dependency of
-// Visits. `pregnancyId` was deferred in Session 7 (it would have referenced
-// a Pregnancy table that didn't exist yet) and is added now that Session 9's
-// Maternal module needs it for anc_due/anc_missed reminders. The reminder
-// worker (REQ-REMIND-001..003), SMS delivery, and GET /patients/:id/reminders
-// (REQ-REMIND-005) all stay NOT_STARTED - this table is written to, never
-// read from, by anything in this build so far.
+// Session 11 (Phase 8 - Reminders & SMS). `attempts` is not in backend.md's
+// literal schema, but REQ-REMIND-003 ("retry next tick up to 3 times, then
+// failed") is structurally impossible to implement correctly without a
+// persisted counter - documented here rather than silently added.
 model Reminder {
   id             String         @id @default(uuid())
   patientId      String         @map("patient_id")
@@ -281,13 +277,25 @@ model Reminder {
   messageNp      String         @map("message_np")
   messageEn      String         @map("message_en")
   status         ReminderStatus @default(pending)
+  attempts       Int            @default(0)
   sentAt         DateTime?      @map("sent_at")
 
-  // @@index([status, dueAt]) is the documented worker-poll index
-  // (REQ-REMIND-001); not added yet since nothing queries by it until the
-  // worker exists (Phase 8) - avoids an unused index, added there instead.
+  // REQ-REMIND-001: the worker's poll query (status=pending AND dueAt<=now).
+  @@index([status, dueAt])
   @@index([patientId])
   @@map("reminders")
+}
+
+// REQ-REMIND-002/006. Demo-only table (docs/DATA_MODEL.md): no index beyond
+// PK - GET /demo/sms reads the last 50 by sentAt, a small table by
+// construction (only ever populated when SMS_MODE=mock).
+model MockSms {
+  id     String   @id @default(uuid())
+  to     String
+  text   String
+  sentAt DateTime @default(now()) @map("sent_at")
+
+  @@map("mock_sms")
 }
 
 // REQ-VISIT-001..009.

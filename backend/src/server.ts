@@ -2,9 +2,13 @@ import { buildApp } from './app.js';
 import { config } from './config.js';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
+import { startWorkers } from './workers.js';
 
 async function main(): Promise<void> {
   const app = await buildApp();
+  // backend.md's directory tree: "same process in hackathon" - BullMQ
+  // workers run alongside the HTTP server rather than as a separate deploy.
+  const workers = startWorkers();
 
   const closeGracefully = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');
@@ -20,6 +24,7 @@ async function main(): Promise<void> {
     forceExitTimer.unref();
 
     await app.close();
+    await workers.close();
     await prisma.$disconnect();
     redis.disconnect();
     clearTimeout(forceExitTimer);
